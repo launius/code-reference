@@ -11,6 +11,134 @@
  * See file:Documentation/input/devices/rotary-encoder.rst for more information
  */
 
+/*
+ * (c) 2022 Yunjae Lim <launius@gmail.com>
+ *
+ * The expanded device tree and driver supports the 2 rotary encoders and push-buttons.
+ *
+ * kernel-5.10.17/arch/arm64/boot/dts/rockchip/rk3308-product.dts
+/{
+	rotary0: rotary-encoder-1 {
+		compatible = "rotary-encoder";
+		pinctrl-names = "default";
+		pinctrl-0 = <&rotary0_gpios &rotary0_push>;
+
+		gpios = <&gpio4 RK_PA0 GPIO_ACTIVE_HIGH>, <&gpio4 RK_PA1 GPIO_ACTIVE_HIGH>;
+		linux,axis = <8>;	// REL_WHEEL
+		rotary-encoder,encoding = "gray";
+		rotary-encoder,relative-axis;
+		rotary-encoder,steps-per-period = <2>;
+		wakeup-source;
+
+		push-gpios = <&gpio4 RK_PA2 GPIO_ACTIVE_HIGH>;
+		linux,push-code = <KEY_ENTER>;
+		linux,push-type = <EV_KEY>;
+	};
+
+	rotary1: rotary-encoder-2 {
+		compatible = "rotary-encoder";
+		pinctrl-names = "default";
+		pinctrl-0 = <&rotary1_gpios &rotary1_push>;
+
+		gpios = <&gpio4 RK_PA3 GPIO_ACTIVE_HIGH>, <&gpio4 RK_PA4 GPIO_ACTIVE_HIGH>;
+		linux,axis = <8>;	// ABS_WHEEL
+		rotary-encoder,steps = <30>;
+		rotary-encoder,encoding = "gray";
+		rotary-encoder,rollover;
+		rotary-encoder,steps-per-period = <2>;
+		wakeup-source;
+
+		push-gpios = <&gpio4 RK_PA5 GPIO_ACTIVE_HIGH>;
+		linux,push-code = <KEY_ENTER>;
+		linux,push-type = <EV_KEY>;
+	};
+};
+
+&pinctrl {
+	rotary {
+		rotary0_gpios: rotary0-gpios {
+			rockchip,pins =
+				<4 RK_PA0 RK_FUNC_GPIO &pcfg_pull_up>,
+				<4 RK_PA1 RK_FUNC_GPIO &pcfg_pull_up>;
+		};
+		
+		rotary0_push: rotary0-push {
+			rockchip,pins =
+				<4 RK_PA2 RK_FUNC_GPIO &pcfg_pull_up>;
+		};
+
+		rotary1_gpios: rotary1-gpios {
+			rockchip,pins =
+				<4 RK_PA3 RK_FUNC_GPIO &pcfg_pull_up>,
+				<4 RK_PA4 RK_FUNC_GPIO &pcfg_pull_up_2ma>;
+		};
+
+		rotary1_push: rotary1-push {
+			rockchip,pins =
+				<4 RK_PA5 RK_FUNC_GPIO &pcfg_pull_up_2ma>;
+		};
+	};
+};
+ *
+ * How to test rotary input devices
+ *
+ * enable CONFIG_INPUT_GPIO_ROTARY_ENCODER from kernel configs
+ * include evtest package in yocto image.bb file
+ *
+ * $ insmod /lib/modules/5.10.17-yocto/kernel/drivers/input/misc/rotary_encoder.ko
+ * $ evtest /dev/input/event0
+ * $ evtest /dev/input/event1
+ *
+Input driver version is 1.0.1
+Input device ID: bus 0x19 vendor 0x0 product 0x0 version 0x0
+Input device name: "rotary-encoder-2"
+Supported events:
+  Event type 0 (EV_SYN)
+  Event type 1 (EV_KEY)
+    Event code 28 (KEY_ENTER)
+  Event type 3 (EV_ABS)
+    Event code 8 (ABS_WHEEL)
+      Value      0
+      Min        0
+      Max       30
+      Flat       1
+Properties:
+Testing ... (interrupt to exit)
+Event: time 1520599071.1520599071, type 3 (EV_ABS), code 8 (ABS_WHEEL), value 1
+Event: time 1520599071.1520599071, -------------- SYN_REPORT ------------
+Event: time 1520599072.1520599072, type 3 (EV_ABS), code 8 (ABS_WHEEL), value 2
+Event: time 1520599072.1520599072, -------------- SYN_REPORT ------------
+Event: time 1520599072.1520599072, type 3 (EV_ABS), code 8 (ABS_WHEEL), value 3
+Event: time 1520599072.1520599072, -------------- SYN_REPORT ------------
+Event: time 1520599073.1520599073, type 3 (EV_ABS), code 8 (ABS_WHEEL), value 4
+Event: time 1520599073.1520599073, -------------- SYN_REPORT ------------
+Event: time 1520599073.1520599073, type 3 (EV_ABS), code 8 (ABS_WHEEL), value 3
+Event: time 1520599073.1520599073, -------------- SYN_REPORT ------------
+Event: time 1520599074.1520599074, type 3 (EV_ABS), code 8 (ABS_WHEEL), value 2
+Event: time 1520599074.1520599074, -------------- SYN_REPORT ------------
+Event: time 1520599074.1520599074, type 3 (EV_ABS), code 8 (ABS_WHEEL), value 1
+Event: time 1520599074.1520599074, -------------- SYN_REPORT ------------
+Event: time 1520599075.1520599075, type 3 (EV_ABS), code 8 (ABS_WHEEL), value 0
+Event: time 1520599075.1520599075, -------------- SYN_REPORT ------------
+Event: time 1520599076.1520599076, type 3 (EV_ABS), code 8 (ABS_WHEEL), value 29
+Event: time 1520599076.1520599076, -------------- SYN_REPORT ------------
+Event: time 1520599077.1520599077, type 3 (EV_ABS), code 8 (ABS_WHEEL), value 28
+Event: time 1520599077.1520599077, -------------- SYN_REPORT ------------
+Event: time 1520599078.1520599078, type 3 (EV_ABS), code 8 (ABS_WHEEL), value 27
+Event: time 1520599078.1520599078, -------------- SYN_REPORT ------------
+Event: time 1520599078.1520599078, type 3 (EV_ABS), code 8 (ABS_WHEEL), value 26
+Event: time 1520599078.1520599078, -------------- SYN_REPORT ------------
+Event: time 1520599116.1520599116, type 1 (EV_KEY), code 28 (KEY_ENTER), value 1
+Event: time 1520599116.1520599116, -------------- SYN_REPORT ------------
+Event: time 1520599116.1520599116, type 1 (EV_KEY), code 28 (KEY_ENTER), value 0
+Event: time 1520599116.1520599116, -------------- SYN_REPORT ------------
+Event: time 1520599116.1520599116, type 1 (EV_KEY), code 28 (KEY_ENTER), value 1
+Event: time 1520599116.1520599116, -------------- SYN_REPORT ------------
+Event: time 1520599117.1520599117, type 1 (EV_KEY), code 28 (KEY_ENTER), value 0
+Event: time 1520599117.1520599117, -------------- SYN_REPORT ------------
+ *
+ */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>
@@ -46,6 +174,11 @@ struct rotary_encoder {
 	struct gpio_descs *gpios;
 
 	unsigned int *irq;
+
+	struct gpio_desc *push_gpio;
+	unsigned int push_code;
+	unsigned int push_type;
+	unsigned int push_irq;
 
 	bool armed;
 	signed char dir;	/* 1 - clockwise, -1 - CCW */
@@ -99,6 +232,8 @@ static void rotary_encoder_report_event(struct rotary_encoder *encoder)
 	}
 
 	input_sync(encoder->input);
+
+	printk(KERN_DEBUG "%s: steps %d dir %d pos %d\n", __func__, encoder->steps, encoder->dir, encoder->pos);
 }
 
 static irqreturn_t rotary_encoder_irq(int irq, void *dev_id)
@@ -129,6 +264,7 @@ static irqreturn_t rotary_encoder_irq(int irq, void *dev_id)
 		break;
 	}
 
+	printk(KERN_DEBUG "%s: irq %d, state %d dir %d armed %d\n", __func__, irq, state, encoder->dir, encoder->armed);
 	mutex_unlock(&encoder->access_mutex);
 
 	return IRQ_HANDLED;
@@ -152,6 +288,7 @@ static irqreturn_t rotary_encoder_half_period_irq(int irq, void *dev_id)
 		}
 	}
 
+	printk(KERN_DEBUG "%s: irq %d, state %d dir %d\n", __func__, irq, state, encoder->dir);
 	mutex_unlock(&encoder->access_mutex);
 
 	return IRQ_HANDLED;
@@ -177,6 +314,25 @@ static irqreturn_t rotary_encoder_quarter_period_irq(int irq, void *dev_id)
 
 out:
 	encoder->last_stable = state;
+	printk(KERN_DEBUG "%s: irq %d, state %d dir %d\n", __func__, irq, state, encoder->dir);
+	mutex_unlock(&encoder->access_mutex);
+
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t rotary_push_irq(int irq, void *dev_id)
+{
+	struct rotary_encoder *encoder = dev_id;
+	int val;
+
+	mutex_lock(&encoder->access_mutex);
+
+	val = gpiod_get_value_cansleep(encoder->push_gpio);
+
+	input_report_key(encoder->input, encoder->push_code, val);
+	input_sync(encoder->input);
+
+	printk(KERN_DEBUG "%s: irq %d, val %d\n", __func__, irq, val);
 	mutex_unlock(&encoder->access_mutex);
 
 	return IRQ_HANDLED;
@@ -247,6 +403,17 @@ static int rotary_encoder_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	/* push-gpios setup */
+	encoder->push_gpio = devm_gpiod_get_optional(dev, "push", GPIOD_IN);
+	if (IS_ERR(encoder->push_gpio))
+		return dev_err_probe(dev, PTR_ERR(encoder->push_gpio), "failed to get push-gpios\n");
+
+	encoder->push_code = KEY_ENTER;
+	device_property_read_u32(dev, "linux,push-code", &encoder->push_code);
+
+	encoder->push_type = EV_KEY;
+	device_property_read_u32(dev, "linux,push-type", &encoder->push_type);
+
 	input = devm_input_allocate_device(dev);
 	if (!input)
 		return -ENOMEM;
@@ -290,17 +457,31 @@ static int rotary_encoder_probe(struct platform_device *pdev)
 
 	for (i = 0; i < encoder->gpios->ndescs; ++i) {
 		encoder->irq[i] = gpiod_to_irq(encoder->gpios->desc[i]);
+		dev_info(dev, "gpio %d to irq %d", desc_to_gpio(encoder->gpios->desc[i]), encoder->irq[i]);
 
 		err = devm_request_threaded_irq(dev, encoder->irq[i],
 				NULL, handler,
-				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING |
-				IRQF_ONESHOT,
+				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
 				DRV_NAME, encoder);
 		if (err) {
 			dev_err(dev, "unable to request IRQ %d (gpio#%d)\n",
 				encoder->irq[i], i);
 			return err;
 		}
+	}
+
+	if (encoder->push_gpio) {
+		input_set_capability(encoder->input, encoder->push_type, encoder->push_code);
+
+		encoder->push_irq = gpiod_to_irq(encoder->push_gpio);
+		dev_info(dev, "push-gpio %d to irq %d\n", desc_to_gpio(encoder->push_gpio), encoder->push_irq);
+
+		err = devm_request_threaded_irq(dev, encoder->push_irq,
+				NULL, rotary_push_irq,
+				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+				DRV_NAME, encoder);
+		if (err)
+			return dev_err_probe(dev, err, "unable to request push IRQ\n");
 	}
 
 	err = input_register_device(input);
@@ -314,6 +495,8 @@ static int rotary_encoder_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, encoder);
 
+	printk(KERN_DEBUG "%s: irqs %d %d %d\n", __func__, encoder->irq[0], encoder->irq[1], encoder->push_irq);
+
 	return 0;
 }
 
@@ -321,6 +504,8 @@ static int __maybe_unused rotary_encoder_suspend(struct device *dev)
 {
 	struct rotary_encoder *encoder = dev_get_drvdata(dev);
 	unsigned int i;
+
+	printk(KERN_DEBUG "%s: \n", __func__);
 
 	if (device_may_wakeup(dev)) {
 		for (i = 0; i < encoder->gpios->ndescs; ++i)
@@ -334,6 +519,8 @@ static int __maybe_unused rotary_encoder_resume(struct device *dev)
 {
 	struct rotary_encoder *encoder = dev_get_drvdata(dev);
 	unsigned int i;
+
+	printk(KERN_DEBUG "%s: \n", __func__);
 
 	if (device_may_wakeup(dev)) {
 		for (i = 0; i < encoder->gpios->ndescs; ++i)
