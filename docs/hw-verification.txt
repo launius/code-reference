@@ -1,0 +1,339 @@
+/*
+ * (c) 2022 Yunjae Lim <launius@gmail.com>
+ *
+ * Hardware verification tools and commands
+ */
+
+----- memtester -----
+root@rockchip-rk3308:/# memtester 50M 1
+memtester version 4.3.0 (64-bit)
+Copyright (C) 2001-2012 Charles Cazabon.
+Licensed under the GNU General Public License version 2 (only).
+
+pagesize is 4096
+pagesizemask is 0xfffffffffffff000
+want 50MB (52428800 bytes)
+got  50MB (52428800 bytes), trying mlock ...locked.
+Loop 1/1:
+  Stuck Address       : ok
+  Random Value        : ok
+  Compare XOR         : ok
+  Compare SUB         : ok
+  Compare MUL         : ok
+  Compare DIV         : ok
+  Compare OR          : ok
+  Compare AND         : ok
+  Sequential Increment: ok
+  Solid Bits          : ok
+  Block Sequential    : ok
+  Checkerboard        : ok
+  Bit Spread          : ok
+  Bit Flip            : ok
+  Walking Ones        : ok
+  Walking Zeroes      : ok
+
+Done.
+
+----- tinymembench -----
+root@rockchip-rk3308:~# tinymembench
+tinymembench v0.4.9 (simple benchmark for memory throughput and latency)
+
+==========================================================================
+== Memory bandwidth tests                                               ==
+==                                                                      ==
+== Note 1: 1MB = 1000000 bytes                                          ==
+== Note 2: Results for 'copy' tests show how many bytes can be          ==
+==         copied per second (adding together read and writen           ==
+==         bytes would have provided twice higher numbers)              ==
+== Note 3: 2-pass copy means that we are using a small temporary buffer ==
+==         to first fetch data into it, and only then write it to the   ==
+==         destination (source -> L1 cache, L1 cache -> destination)    ==
+== Note 4: If sample standard deviation exceeds 0.1%, it is shown in    ==
+==         brackets                                                     ==
+==========================================================================
+
+ C copy backwards                                     :    749.1 MB/s
+ C copy backwards (32 byte blocks)                    :    733.7 MB/s
+ C copy backwards (64 byte blocks)                    :    750.1 MB/s
+ C copy                                               :    752.3 MB/s
+ C copy prefetched (32 bytes step)                    :    799.0 MB/s
+ C copy prefetched (64 bytes step)                    :    798.9 MB/s
+ C 2-pass copy                                        :    740.6 MB/s
+ C 2-pass copy prefetched (32 bytes step)             :    784.1 MB/s
+ C 2-pass copy prefetched (64 bytes step)             :    783.7 MB/s
+ C fill                                               :   1866.6 MB/s
+ C fill (shuffle within 16 byte blocks)               :   1866.9 MB/s
+ C fill (shuffle within 32 byte blocks)               :   1866.8 MB/s
+ C fill (shuffle within 64 byte blocks)               :   1866.7 MB/s
+ ---
+ standard memcpy                                      :    749.9 MB/s
+ standard memset                                      :   1867.4 MB/s
+ ---
+ NEON LDP/STP copy                                    :    747.2 MB/s
+ NEON LDP/STP copy pldl2strm (32 bytes step)          :    542.6 MB/s
+ NEON LDP/STP copy pldl2strm (64 bytes step)          :    626.8 MB/s
+ NEON LDP/STP copy pldl1keep (32 bytes step)          :    808.5 MB/s
+ NEON LDP/STP copy pldl1keep (64 bytes step)          :    805.1 MB/s
+ NEON LD1/ST1 copy                                    :    740.9 MB/s
+ NEON STP fill                                        :   1867.1 MB/s
+ NEON STNP fill                                       :   1671.2 MB/s (0.4%)
+ ARM LDP/STP copy                                     :    739.5 MB/s
+ ARM STP fill                                         :   1867.0 MB/s
+ ARM STNP fill                                        :   1661.4 MB/s (0.2%)
+
+==========================================================================
+== Memory latency test                                                  ==
+==                                                                      ==
+== Average time is measured for random memory accesses in the buffers   ==
+== of different sizes. The larger is the buffer, the more significant   ==
+== are relative contributions of TLB, L1/L2 cache misses and SDRAM      ==
+== accesses. For extremely large buffer sizes we are expecting to see   ==
+== page table walk with several requests to SDRAM for almost every      ==
+== memory access (though 64MiB is not nearly large enough to experience ==
+== this effect to its fullest).                                         ==
+==                                                                      ==
+== Note 1: All the numbers are representing extra time, which needs to  ==
+==         be added to L1 cache latency. The cycle timings for L1 cache ==
+==         latency can be usually found in the processor documentation. ==
+== Note 2: Dual random read means that we are simultaneously performing ==
+==         two independent memory accesses at a time. In the case if    ==
+==         the memory subsystem can't handle multiple outstanding       ==
+==         requests, dual random read has the same timings as two       ==
+==         single reads performed one after another.                    ==
+==========================================================================
+
+block size : single random read / dual random read
+      1024 :    0.0 ns          /     0.0 ns
+      2048 :    0.0 ns          /     0.0 ns
+      4096 :    0.0 ns          /     0.0 ns
+      8192 :    0.0 ns          /     0.0 ns
+     16384 :    0.0 ns          /     0.0 ns
+     32768 :    0.1 ns          /     0.1 ns
+     65536 :    8.4 ns          /    13.6 ns
+    131072 :   12.9 ns          /    18.9 ns
+    262144 :   17.2 ns          /    24.0 ns
+    524288 :  129.1 ns          /   198.2 ns
+   1048576 :  193.8 ns          /   259.5 ns
+   2097152 :  227.3 ns          /   281.0 ns
+   4194304 :  253.0 ns          /   303.5 ns
+   8388608 :  267.6 ns          /   314.6 ns
+  16777216 :  278.1 ns          /   322.6 ns
+  33554432 :  285.3 ns          /   328.6 ns
+  67108864 :  313.3 ns          /   379.9 ns
+
+
+----- eMMC performance -----
+root@rockchip-rk3308:~# cat /sys/kernel/debug/mmc0/ios
+clock:          150000000 Hz
+actual clock:   147456000 Hz
+vdd:            21 (3.3 ~ 3.4 V)
+bus mode:       2 (push-pull)
+chip select:    0 (don't care)
+power mode:     2 (on)
+bus width:      3 (8 bits)
+timing spec:    9 (mmc HS200)
+signal voltage: 1 (1.80 V)
+driver type:    0 (driver type B)
+
+root@rockchip-rk3308:/# dd if=/dev/urandom of=/test bs=1M count=40
+40+0 records in
+40+0 records out
+41943040 bytes (40.0MB) copied, 2.621640 seconds, 15.3MB/s
+
+root@rockchip-rk3308:/# dd if=/test of=/dev/null bs=1M count=40
+40+0 records in
+40+0 records out
+41943040 bytes (40.0MB) copied, 0.082696 seconds, 483.7MB/s
+
+
+----- bonnie++ disk I/O -----
+root@rockchip-rk3308:/# bonnie\+\+ -d /tmp -s 16:1024 -n 8 -r 8 -u0:0
+Using uid:0, gid:0.
+Writing with putc()...done
+Writing intelligently...done
+Rewriting...done
+Reading with getc()...done
+Reading intelligently...done
+start 'em...done...done...done...
+Create files in sequential order...done.
+Stat files in sequential order...done.
+Delete files in sequential order...done.
+Create files in random order...done.
+Stat files in random order...done.
+Delete files in random order...done.
+Version  1.04       ------Sequential Output------ --Sequential Input- --Random-
+                    -Per Chr- --Block-- -Rewrite- -Per Chr- --Block-- --Seeks--
+Machine   Size:chnk K/sec %CP K/sec %CP K/sec %CP K/sec %CP K/sec %CP  /sec %CP
+rockchip-rk3308  16M:1k 10177  96 23238  96 18433  66 15857  97 +++++ +++  5387  63
+                    ------Sequential Create------ --------Random Create--------
+                    -Create-- --Read--- -Delete-- -Create-- --Read--- -Delete--
+              files  /sec %CP  /sec %CP  /sec %CP  /sec %CP  /sec %CP  /sec %CP
+                  8  5726  93 12484  85  4107  69  5173  79 12981  85  3397  59
+rockchip-rk3308,16M:1k,10177,96,23238,96,18433,66,15857,97,+++++,+++,5386.8,63,8,5726,93,12484,85,4107,69,5173,79,12981,85,3397,59
+
+root@rockchip-rk3308:/var/volatile/tmp# bonnie\+\+ -d /tmp -s 192M -n 32:0:0:16 -r 8 -u0:0
+Using uid:0, gid:0.
+Writing with putc()...done
+Writing intelligently...done
+Rewriting...done
+Reading with getc()...done
+Reading intelligently...done
+start 'em...done...done...done...
+Create files in sequential order...done.
+Stat files in sequential order...done.
+Delete files in sequential order...done.
+Create files in random order...done.
+Stat files in random order...done.
+Delete files in random order...done.
+Version  1.04       ------Sequential Output------ --Sequential Input- --Random-
+                    -Per Chr- --Block-- -Rewrite- -Per Chr- --Block-- --Seeks--
+Machine        Size K/sec %CP K/sec %CP K/sec %CP K/sec %CP K/sec %CP  /sec %CP
+rockchip-rk3308    192M 17334  99 203317  99 199127  99 18479  99 +++++ +++ +++++ +++
+                    ------Sequential Create------ --------Random Create--------
+                    -Create-- --Read--- -Delete-- -Create-- --Read--- -Delete--
+              files  /sec %CP  /sec %CP  /sec %CP  /sec %CP  /sec %CP  /sec %CP
+              32/16 21915  95 +++++ +++ 26903  90 22003  96 +++++ +++ 26532  88
+rockchip-rk3308,192M,17334,99,203317,99,199127,99,18479,99,+++++,+++,+++++,+++,32/16,21915,95,+++++,+++,26903,90,22003,96,+++++,+++,26532,88
+
+
+----- iostat (sysstat package) -----
+root@rockchip-rk3308:~# iostat
+Linux 5.10.17-rt32-yocto-preempt-rt (rockchip-rk3308)  03/09/18        _aarch64_       (4 CPU)
+
+avg-cpu:  %user   %nice %system %iowait  %steal   %idle
+           0.09    0.00    0.32    0.01    0.00   99.58
+
+Device             tps    kB_read/s    kB_wrtn/s    kB_dscd/s    kB_read    kB_wrtn    kB_dscd
+mmcblk0           2.27        47.21         0.95         0.00      11758        236          0
+mmcblk0boot0      0.12         0.47         0.00         0.00        116          0          0
+mmcblk0boot1      0.12         0.47         0.00         0.00        116          0          0
+
+
+root@rockchip-rk3308:/# iostat -d 1 5
+Linux 5.10.17-rt32-yocto-preempt-rt (rockchip-rk3308)  03/09/18        _aarch64_       (4 CPU)
+
+Device             tps    kB_read/s    kB_wrtn/s    kB_dscd/s    kB_read    kB_wrtn    kB_dscd
+mmcblk0          13.91       153.15       163.66         0.00     494165     528079          0
+
+
+----- i2c-tools -----
+root@rockchip-rk3308:~# i2cdetect -l
+i2c-3   i2c             rk3x-i2c                                I2C adapter
+i2c-1   i2c             rk3x-i2c                                I2C adapter
+root@rockchip-rk3308:~# i2cdetect -y 3
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:          -- -- -- -- -- -- -- -- -- -- -- -- --
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- 4e --
+50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+70: -- -- -- -- -- -- -- --
+root@rockchip-rk3308:~# i2cdetect -y 1
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:          -- -- -- -- -- -- -- -- -- -- -- -- --
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- 4e --
+50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+70: -- -- -- -- -- -- -- --
+root@rockchip-rk3308:~# i2cdump -y 1 0x4e
+No size specified (using byte-data access)
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f    0123456789abcdef
+00: 99 2e 11 03 00 00 11 00 11 10 10 10 00 00 00 00    ?.??..?.????....
+10: 02 00 ff 0f 7f 7f 00 00 00 00 0a 00 00 10 0c 00    ?..???....?..??.
+20: 00 00 00 00 d0 02 34 00 00 00 00 00 00 00 02 00    ....??4.......?.
+30: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+40: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+50: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+60: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+70: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+90: 03 00 00 00 00 00 00 00 02 00 00 00 01 04 08 80    ?.......?...????
+a0: 00 0a 03 47 01 19 00 00 00 00 00 00 00 00 00 00    .??G??..........
+b0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+c0: 13 e4 e0 3f 99 2e 11 03 00 00 24 0c 90 6a 10 fe    ?????.??..$??j??
+d0: 13 e4 e0 3f 99 2e 11 03 00 00 24 0c 90 6a 10 fe    ?????.??..$??j??
+e0: 13 e4 e0 3f 99 2e 11 03 00 00 24 0c 90 6a 10 fe    ?????.??..$??j??
+f0: 13 e4 e0 3f 99 2e 11 03 00 00 24 0c 90 6a 10 fe    ?????.??..$??j??
+root@rockchip-rk3308:~# i2cdump -y 3 0x4e
+No size specified (using byte-data access)
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f    0123456789abcdef
+00: 99 2e 11 03 00 00 11 00 11 10 10 10 00 00 00 00    ?.??..?.????....
+10: 03 00 ff 0f 7f 7f 00 00 00 00 0a 00 00 15 0c 00    ?..???....?..??.
+20: 00 00 00 00 d0 02 34 00 00 00 00 00 00 00 02 00    ....??4.......?.
+30: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+40: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+50: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+60: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+70: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+90: 03 00 00 00 00 00 00 00 00 00 00 00 01 04 08 80    ?...........????
+a0: 00 0a 03 47 01 19 00 00 00 00 00 00 00 00 00 00    .??G??..........
+b0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+c0: 1d ee e2 3f 99 2e 11 03 00 00 24 0c 90 6a 10 fe    ?????.??..$??j??
+d0: 1d ee e2 3f 99 2e 11 03 00 00 24 0c 90 6a 10 fe    ?????.??..$??j??
+e0: 1d ee e2 3f 99 2e 11 03 00 00 24 0c 90 6a 10 fe    ?????.??..$??j??
+f0: 1d ee e2 3f 99 2e 11 03 00 00 24 0c 90 6a 10 fe    ?????.??..$??j??
+root@rockchip-rk3308:~# i2cget -y 3 0x4e 0
+0x99
+root@rockchip-rk3308:~# i2cget -y 3 0x4e 1
+0x2e
+root@rockchip-rk3308:~# i2cget -y 3 0x4e 3
+0x03
+root@rockchip-rk3308:~# i2cget -y 3 0x4e 0x4
+0x00
+root@rockchip-rk3308:~# i2cget -y 3 0x4e 0x3
+0x03
+root@rockchip-rk3308:~# i2cset -y 3 0x4e 0x3 0x12
+root@rockchip-rk3308:~# i2cget -y 3 0x4e 0x3
+0x03
+
+
+----- SAR ADC -----
+root@rockchip-rk3308:/sys/devices/platform/ff1e0000.saradc/iio:device0# cat in_voltage0_raw
+512
+[   80.004826] rockchip_saradc_isr: last_val 512
+[   80.004864] rockchip_saradc_isr: last_val 512
+[   80.004917] rockchip_saradc_read_raw: IIO_CHAN_INFO_RAW 512
+root@rockchip-rk3308:/sys/devices/platform/ff1e0000.saradc/iio:device0# cat in_voltage_scale
+1.757812500
+[  131.900072] rockchip_saradc_read_raw: IIO_CHAN_INFO_SCALE 1800 10
+root@rockchip-rk3308:/sys/devices/platform/ff1e0000.saradc/iio:device0# cat in_voltage*
+514
+1023
+3
+0
+58
+71
+1.757812500
+root@rockchip-rk3308:/sys/devices/platform/ff1e0000.saradc/iio:device0# cat in_voltage*
+515
+1021
+168
+164
+97
+78
+1.757812500
+root@rockchip-rk3308:/sys/devices/platform/ff1e0000.saradc/iio:device0# cat /sys/class/hwmon/hwmon0/in*_input
+901
+290
+288
+[  768.634920] iio_hwmon_read_val: channel 0
+[  768.635034] rockchip_saradc_isr: last_val 513
+[  768.635091] rockchip_saradc_read_raw: IIO_CHAN_INFO_RAW 513
+[  768.635120] rockchip_saradc_read_raw: IIO_CHAN_INFO_SCALE 1800 10
+[  768.635131] iio_hwmon_read_val: type 0, result 901
+[  768.635679] iio_hwmon_read_val: channel 1
+[  768.635735] rockchip_saradc_isr: last_val 165
+[  768.635774] rockchip_saradc_read_raw: IIO_CHAN_INFO_RAW 165
+[  768.635793] rockchip_saradc_read_raw: IIO_CHAN_INFO_SCALE 1800 10
+[  768.635804] iio_hwmon_read_val: type 0, result 290
+[  768.636220] iio_hwmon_read_val: channel 2
+[  768.636273] rockchip_saradc_isr: last_val 164
+[  768.636311] rockchip_saradc_read_raw: IIO_CHAN_INFO_RAW 164
+[  768.636327] rockchip_saradc_read_raw: IIO_CHAN_INFO_SCALE 1800 10
+[  768.636338] iio_hwmon_read_val: type 0, result 288
