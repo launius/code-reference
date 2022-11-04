@@ -2,6 +2,7 @@
  * (c) 2022 Yunjae Lim <launius@gmail.com>
  *
  * Hardware verification tools and commands
+ * (DDR memory, eMMC disk I/O, I2C, SAR ADC)
  */
 
 ----- memtester -----
