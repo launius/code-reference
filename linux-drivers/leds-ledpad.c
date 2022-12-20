@@ -35,8 +35,8 @@ obj-$(CONFIG_LEDPAD)                    += leds-ledpad.o
 /* How to test SPI LEDs
  * enable CONFIG_LEDPAD kernel config
  * echo 0 > /sys/class/leds/multicolor\:status/brightness (LEDs off)
- * echo 1 > /sys/class/leds/multicolor\:status/brightness (LEDs on, set all pads)
- * echo 2 > /sys/class/leds/multicolor\:status/brightness (LEDs on, set pad1)
+ * echo 1 > /sys/class/leds/multicolor\:status/brightness (LEDs on, set all leds from user space)
+ * echo 127 > /sys/class/leds/multicolor\:status/brightness (LEDs on, set leds in kernel space)
  * echo <num> > /sys/class/leds/multicolor\:status/brightness (LEDs on, write random)
  * 
  * How to test Keypads
@@ -59,8 +59,6 @@ obj-$(CONFIG_LEDPAD)                    += leds-ledpad.o
 #include <linux/init.h>
 #include <linux/timer.h>
 
-#include "leds-spi.h"
-
 #define KEYPAD1			0xfe
 #define KEYPAD2			0xfb
 #define KEYPAD3			0xfd
@@ -70,8 +68,8 @@ obj-$(CONFIG_LEDPAD)                    += leds-ledpad.o
 #define KEYPAD7			0x7f
 #define KEYPAD8			0xbf
 
-#define LED_CW		(1)
-#define LED_CCW		(-1)
+#define SPI_BUF_SIZE		680
+#define SPI_BUF_PADDING		50
 
 struct ledpad_chipdef {
 	/* SPI byte that will be send to switch the LED off */
@@ -99,7 +97,7 @@ static struct ledpad *xlp_data;
 
 static const struct ledpad_chipdef ledpad_cdef = {
 	.off_value = 0x0,
-	.max_value = 0x3F,
+	.max_value = 0x7F,
 };
 
 struct control_surface_gpio_map {
@@ -164,9 +162,9 @@ static int ledpad_spi_read(void *rxbuf, size_t len, unsigned int speed_hz)
 		spin_unlock_irq(&xlp_data->spi_lock);
 	}
 
-	// Allow the shift register(s) connected to the MISO to latch their D0-7 data
-	gpiod_set_value_cansleep(xlp_data->gpiod, 0);
+	// set to ACTIVE_LOW
 	gpiod_set_value_cansleep(xlp_data->gpiod, 1);
+	gpiod_set_value_cansleep(xlp_data->gpiod, 0);
 
 	// Perform a single byte read (per shift register)
 #ifdef CONFIG_SPI_SYNC
@@ -177,7 +175,6 @@ static int ledpad_spi_read(void *rxbuf, size_t len, unsigned int speed_hz)
 	ret = spi_read(spi, rxbuf, len);
 #endif
 
-	printk(KERN_DEBUG "%s: %*ph\n", __func__, 8, rxbuf);
 	return ret;
 }
 
@@ -196,28 +193,17 @@ static void ledpad_keypad_handle(void)
 
 		switch (key) {
 			case KEYPAD1:
-				ledpad_brightness_set_blocking(&xlp_data->ldev, 0);
-				break;
 			case KEYPAD2:
-				ledpad_brightness_set_blocking(&xlp_data->ldev, 1);
-				break;
 			case KEYPAD3:
-				ledpad_brightness_set_blocking(&xlp_data->ldev, 2);
-				break;
 			case KEYPAD4:
-				ledpad_brightness_set_blocking(&xlp_data->ldev, 9);
+				// TODO: no keypad action in kernel space
+				ledpad_brightness_set_blocking(&xlp_data->ldev, LED_HALF);
 				break;
 			case KEYPAD5:
-				ledpad_brightness_set_blocking(&xlp_data->ldev, 0);
-				break;
 			case KEYPAD6:
-				ledpad_brightness_set_blocking(&xlp_data->ldev, 1);
-				break;
 			case KEYPAD7:
-				ledpad_brightness_set_blocking(&xlp_data->ldev, 2);
-				break;
 			case KEYPAD8:
-				ledpad_brightness_set_blocking(&xlp_data->ldev, 9);
+				ledpad_brightness_set_blocking(&xlp_data->ldev, LED_OFF);
 				break;
 		}
 		
@@ -252,6 +238,24 @@ static int ledpad_threadfn(void *unused)
 	return 0;
 }
 
+static ssize_t misc_spi_read(struct file *file,
+			char __user *buf, size_t n, loff_t *offset)
+{
+	ssize_t status;
+
+	mutex_lock(&xlp_data->mutex);
+
+	status = ledpad_spi_read(xlp_data->gpio_read_buf, n, xlp_data->speed_hz);
+	if (status)
+		return -EFAULT;
+
+	status = copy_to_user(buf, xlp_data->gpio_read_buf, 1);
+	mutex_unlock(&xlp_data->mutex);
+
+	printk(KERN_INFO "%s: 0x%x, status %ld\n", __func__, buf[0], status);
+	return status;
+}
+
 static ssize_t misc_spi_write(struct file *file,
 			const char __user *buf, size_t n, loff_t *offset)
 {
@@ -266,71 +270,81 @@ static ssize_t misc_spi_write(struct file *file,
 	ktime_t end_time;
 	ktime_t cost_time;
 
-	memset(tmp, 0, sizeof(tmp));
-	if (copy_from_user(tmp, buf, n))
-		return -EFAULT;
+	if (n >= SPI_BUF_SIZE) {
+		memset(xlp_data->txbuf, 0, SPI_BUF_SIZE);
+		if (copy_from_user(xlp_data->txbuf, buf, n))
+			return -EFAULT;
+		xlp_data->txlen = n;
 
-	cmd = tmp;
-	data = tmp;
+		printk(KERN_INFO "%s: %dbytes > /dev/misc\n", __func__, xlp_data->txlen);
 
-	while (data < (tmp + n)) {
-		data = strstr(data, " ");
-		if (!data)
-			break;
-		*data = 0;
-		argv[argc] = ++data;
-		argc++;
-		if (argc >= 16)
-			break;
-	}
-	tmp[n - 1] = 0;
-
-	printk(KERN_INFO "%s: %s > /dev/misc\n", __func__, cmd);
-
-	if (!strcmp(cmd, "read")) {
-		// TODO: temporary spi_read test code
-		sscanf(argv[0], "%d", &times);
-		sscanf(argv[1], "%d", &size);
-
-		start_time = ktime_get();
-		for (i = 0; i < times; i++) {
-			ledpad_spi_read(xlp_data->gpio_read_buf, 1, xlp_data->speed_hz);
-			printk(KERN_INFO "%s: %*ph\n", __func__, 8, xlp_data->gpio_read_buf);
-
-			msleep(25);
-		}
-
-		end_time = ktime_get();
-		cost_time = ktime_sub(end_time, start_time);
-		us = ktime_to_us(cost_time);
-
-		bytes = size * times * 1;
-		bytes = bytes * 1000 / us;
-		printk(KERN_INFO "spi read %d*%d cost %ldus speed:%ldKB/S\n", size, times, us, bytes);
-	} else if (!strcmp(cmd, "timer")) {
-		/*Starting the timer.*/
-		timer_setup(&spi_poll_timer, SpiPollTimerHandler, 0);
-		mod_timer( &spi_poll_timer, jiffies + msecs_to_jiffies(spi_poll_interval));
-	} else if (!strcmp(cmd, "thread")) {
-		task = kthread_create(ledpad_threadfn, NULL, "readspi");
-		if (task)
-			wake_up_process(task);
-		else
-			printk(KERN_ERR "%s: cannot create kthread\n", __func__);
-	} else if (!strcmp(cmd, "stop")) {
-		if (task) {
-			kthread_stop(task);
-			task = NULL;
-		}
-
-		// TODO: use the thread instead of timer
-		del_timer(&spi_poll_timer);
+		ledpad_brightness_set_blocking(&xlp_data->ldev, LED_ON);
 	} else {
-		printk(KERN_INFO "echo cmd times size value > /dev/misc_spi_ledpad\n");
-		printk(KERN_INFO "echo read 1000 1 > /dev/misc_spi_ledpad\n");
-		printk(KERN_INFO "echo timer > /dev/misc_spi_ledpad\n");
-		printk(KERN_INFO "echo thread > /dev/misc_spi_ledpad\n");
-		printk(KERN_INFO "echo stop > /dev/misc_spi_ledpad\n");
+		memset(tmp, 0, sizeof(tmp));
+		if (copy_from_user(tmp, buf, n))
+			return -EFAULT;
+
+		cmd = tmp;
+		data = tmp;
+
+		while (data < (tmp + n)) {
+			data = strstr(data, " ");
+			if (!data)
+				break;
+			*data = 0;
+			argv[argc] = ++data;
+			argc++;
+			if (argc >= 16)
+				break;
+		}
+		tmp[n - 1] = 0;
+
+		printk(KERN_INFO "%s: %s > /dev/misc\n", __func__, cmd);
+
+		if (!strcmp(cmd, "read")) {
+			// TODO: temporary spi_read test code
+			sscanf(argv[0], "%d", &times);
+			sscanf(argv[1], "%d", &size);
+
+			start_time = ktime_get();
+			for (i = 0; i < times; i++) {
+				ledpad_spi_read(xlp_data->gpio_read_buf, 1, xlp_data->speed_hz);
+				printk(KERN_INFO "%s: %*ph\n", __func__, 8, xlp_data->gpio_read_buf);
+				msleep(25);
+			}
+
+			end_time = ktime_get();
+			cost_time = ktime_sub(end_time, start_time);
+			us = ktime_to_us(cost_time);
+
+			bytes = size * times * 1;
+			bytes = bytes * 1000 / us;
+			printk(KERN_INFO "spi read %d*%d cost %ldus speed:%ldKB/S\n", size, times, us, bytes);
+		} else if (!strcmp(cmd, "timer")) {
+			/*Starting the timer.*/
+			timer_setup(&spi_poll_timer, SpiPollTimerHandler, 0);
+			mod_timer( &spi_poll_timer, jiffies + msecs_to_jiffies(spi_poll_interval));
+		} else if (!strcmp(cmd, "thread")) {
+			task = kthread_create(ledpad_threadfn, NULL, "readspi");
+			if (task)
+				wake_up_process(task);
+			else
+				printk(KERN_ERR "%s: cannot create kthread\n", __func__);
+		} else if (!strcmp(cmd, "stop")) {
+			if (task) {
+				kthread_stop(task);
+				task = NULL;
+			}
+
+			// TODO: use the thread instead of timer
+			del_timer(&spi_poll_timer);
+		} else {
+			printk(KERN_INFO "echo cmd times size value > /dev/misc_spi_ledpad\n");
+			printk(KERN_INFO "echo read 1000 1 > /dev/misc_spi_ledpad\n");
+			printk(KERN_INFO "echo timer > /dev/misc_spi_ledpad\n");
+			printk(KERN_INFO "echo thread > /dev/misc_spi_ledpad\n");
+			printk(KERN_INFO "echo stop > /dev/misc_spi_ledpad\n");
+		}
 	}
 
 	return n;
@@ -342,7 +356,6 @@ static int ledpad_brightness_set_blocking(struct led_classdev *dev,
 	struct ledpad *lp = container_of(dev, struct ledpad, ldev);
 	struct spi_device *spi;
 	int ret;
-	int size = sizeof(struct spi_padded_buf);
 	int i;
 
 	printk(KERN_INFO "%s: %d > %s\n", __func__, brightness, dev->name);
@@ -352,41 +365,48 @@ static int ledpad_brightness_set_blocking(struct led_classdev *dev,
 	spin_unlock_irq(&lp->spi_lock);
 
 	mutex_lock(&lp->mutex);
-	memset(lp->txbuf, 0, size);
 
 	switch(brightness) {
-		case 0:
-			led_spi_init(lp->txbuf, &lp->txlen);
-			led_spi_off();
+		case LED_OFF:
+			memset(lp->txbuf, 0, SPI_BUF_SIZE);
+			for (i = SPI_BUF_PADDING + 2 ; i < SPI_BUF_SIZE - SPI_BUF_PADDING - 2 ; i++)
+				((u8 *)(lp->txbuf))[i] = 0x11;
+			lp->txlen = SPI_BUF_SIZE;
 			break;
-		case 1:
-			led_spi_init(lp->txbuf, &lp->txlen);
-			led_spi_on();
+		case LED_ON:
+			for (i = 0 ; i < 680 ; i++)
+				printk("%d: 0x%x", i, ((u8 *)(lp->txbuf))[i]);
 			break;
-		case 2:
-			led_spi_init(lp->txbuf, &lp->txlen);
-			led_spi_pad1();
+		case LED_HALF:
+			memset(lp->txbuf, 0, SPI_BUF_SIZE);
+			for (i = SPI_BUF_PADDING + 2 ; i < SPI_BUF_SIZE - SPI_BUF_PADDING - 2 ; i++)
+				((u8 *)(lp->txbuf))[i] = 0x11;
+
+			// Red colour
+			((u8 *)(lp->txbuf))[582] = 0x13;
+			((u8 *)(lp->txbuf))[584] = 0x33;
+			((u8 *)(lp->txbuf))[585] = 0x33;
+			((u8 *)(lp->txbuf))[586] = 0x33;
+			((u8 *)(lp->txbuf))[587] = 0x33;
+			((u8 *)(lp->txbuf))[590] = 0x31;
+			((u8 *)(lp->txbuf))[591] = 0x31;
+
+			((u8 *)(lp->txbuf))[594] = 0x13;
+			((u8 *)(lp->txbuf))[596] = 0x33;
+			((u8 *)(lp->txbuf))[597] = 0x33;
+			((u8 *)(lp->txbuf))[598] = 0x33;
+			((u8 *)(lp->txbuf))[599] = 0x33;
+			((u8 *)(lp->txbuf))[602] = 0x31;
+			((u8 *)(lp->txbuf))[603] = 0x31;
+
+			lp->txlen = SPI_BUF_SIZE;
 			break;
-		case 3:
-			led_spi_init(lp->txbuf, &lp->txlen);
-			led_spi_ring1(LED_CW);
-			break;
-		case 4:
-			led_spi_init(lp->txbuf, &lp->txlen);
-			led_spi_ring1(LED_CCW);
-			break;
-		case 5:
-			led_spi_init(lp->txbuf, &lp->txlen);
-			led_spi_ring2(LED_CW);
-			break;
-		case 6:
-			led_spi_init(lp->txbuf, &lp->txlen);
-			led_spi_ring2(LED_CCW);
-			break;
+		case LED_FULL:
 		default:
-			for (i = 0 ; i < size ; i++)
+			memset(lp->txbuf, 0, SPI_BUF_SIZE);
+			for (i = SPI_BUF_PADDING ; i < SPI_BUF_SIZE - SPI_BUF_PADDING ; i++)
 				((u8 *)(lp->txbuf))[i] = i % 256;
-			lp->txlen = size;
+			lp->txlen = SPI_BUF_SIZE;
 			break;
 	}
 
@@ -432,7 +452,7 @@ static int ledpad_probe(struct spi_device *spi)
 	data->ldev.max_brightness = data->cdef->max_value - data->cdef->off_value;
 	data->ldev.brightness_set_blocking = ledpad_brightness_set_blocking;
 
-	data->txbuf = devm_kzalloc(dev, sizeof(struct spi_padded_buf), GFP_KERNEL);
+	data->txbuf = devm_kzalloc(dev, SPI_BUF_SIZE, GFP_KERNEL);
 	if (!data->txbuf) {
 		dev_err(dev, "failed to alloc tx memory.");
 		return -ENOMEM;
@@ -470,13 +490,14 @@ static int ledpad_probe(struct spi_device *spi)
 
 	ret = devm_gpiochip_add_data(&spi->dev, &data->chip, data);
 
-	data->gpiod = devm_gpiod_get_optional(&spi->dev, "latch", GPIOD_OUT_HIGH);
+	data->gpiod = devm_gpiod_get_optional(&spi->dev, "latch", GPIOD_OUT_LOW);
 	
 	data->speed_hz = spi->max_speed_hz;
 	spi_set_drvdata(spi, data);
 	xlp_data = data;
 
-	printk(KERN_INFO "%s: name=%s, bus_num=%d, cs=%d, mode=%d, speed=%d\n", __func__, spi->modalias, spi->master->bus_num, spi->chip_select, spi->mode, spi->max_speed_hz);
+	printk(KERN_INFO "%s: name=%s, bus_num=%d, cs=%d, mode=%d, speed=%d\n", __func__,
+		spi->modalias, spi->master->bus_num, spi->chip_select, spi->mode, spi->max_speed_hz);
 
 	// TODO: start on boot
 	// printk(KERN_INFO "%s: start keypad reading...\n", __func__);
@@ -528,6 +549,7 @@ static struct spi_driver ledpad_driver = {
 };
 
 static const struct file_operations misc_spi_fops = {
+	.read = misc_spi_read,
 	.write = misc_spi_write,
 };
 
