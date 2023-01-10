@@ -26,6 +26,16 @@
 };
 */
 
+/* drivers\leds\Kconfig
+config LEDS_LEDPAD
+	tristate "LED and GPIO keypad support for LED PAD"
+	depends on LEDS_CLASS
+	depends on SPI
+	depends on OF
+	help
+	  This option enables support for LED PAD.
+*/
+
 /* drivers/leds/Makefile
 # LED SPI Drivers
 leds-ledpad-objs                        := leds-ledpad-main.o leds-spi.o
@@ -325,10 +335,15 @@ static ssize_t misc_spi_write(struct file *file,
 			timer_setup(&spi_poll_timer, SpiPollTimerHandler, 0);
 			mod_timer( &spi_poll_timer, jiffies + msecs_to_jiffies(spi_poll_interval));
 		} else if (!strcmp(cmd, "thread")) {
+#ifndef RUN_KTHREAD
 			task = kthread_create(ledpad_threadfn, NULL, "readspi");
 			if (task)
 				wake_up_process(task);
 			else
+#else
+			task = kthread_run(ledpad_threadfn, NULL, "read spi");
+			if (!task)
+#endif
 				printk(KERN_ERR "%s: cannot create kthread\n", __func__);
 		} else if (!strcmp(cmd, "stop")) {
 			if (task) {
@@ -498,12 +513,6 @@ static int ledpad_probe(struct spi_device *spi)
 
 	printk(KERN_INFO "%s: name=%s, bus_num=%d, cs=%d, mode=%d, speed=%d\n", __func__,
 		spi->modalias, spi->master->bus_num, spi->chip_select, spi->mode, spi->max_speed_hz);
-
-	// TODO: start on boot
-	// printk(KERN_INFO "%s: start keypad reading...\n", __func__);
-	// task = kthread_run(ledpad_threadfn, NULL, "read spi");
-	// if (!task)
-	// 	printk(KERN_ERR "%s: cannot create kthread\n", __func__);
 
 	return 0;
 }
