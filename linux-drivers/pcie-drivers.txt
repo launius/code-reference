@@ -1,0 +1,313 @@
+
+PCIe 2.5G Ethernet Verification on Rockchip RK3588 Linux
+
+1. Kernel device tree:
+
+user@user-VirtualBox:~/rcv/tmp/linux-rcv$ git show HEAD
+commit 409c370dcb26267dd777e8aa57b8165cff4697c8 (HEAD)
+Author: Yunjae Lim <launius@gmail.com>
+Date:   Fri Jan 27 14:51:32 2023 +1100
+
+    changes for pcie ethernet
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3588-rcv-go-linux.dts b/arch/arm64/boot/dts/rockchip/rk3588-rcv-go-linux.dts
+index 0ad930d3e493..2331e26cbb6a 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3588-rcv-go-linux.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3588-rcv-go-linux.dts
+@@ -125,6 +125,17 @@ vcc3v3_lcd_n: vcc3v3-lcd0-n {
+                vin-supply = <&vcc_1v8_s0>;
+        };
+ 
++       vcc3v3_pcie30: vcc3v3-pcie30 {
++               compatible = "regulator-fixed";
++               regulator-name = "vcc3v3_pcie30";
++               regulator-min-microvolt = <3300000>;
++               regulator-max-microvolt = <3300000>;
++               enable-active-high;
++               gpios = <&gpio4 RK_PB6 GPIO_ACTIVE_HIGH>;
++               startup-delay-us = <5000>;
++               vin-supply = <&vcc12v_dcin>;
++       };
++
+        vcc5v0_host: vcc5v0-host {
+                compatible = "regulator-fixed";
+                regulator-name = "vcc5v0_host";
+@@ -293,20 +304,20 @@ &gmac1 {
+        /* Reset time is 20ms, 100ms for rtl8211f */
+        snps,reset-delays-us = <0 20000 100000>;
+ 
++       clock-names = "stmmaceth", "clk_mac_ref",
++                             "pclk_mac", "aclk_mac",
++                             "ptp_ref", "eth1_reclk0";
++       clocks = <&cru CLK_GMAC_125M>, <&cru CLK_GMAC_50M>,
++                <&cru PCLK_GMAC1>, <&cru ACLK_GMAC1>,
++                <&cru CLK_GMAC1_PTP_REF>, <&cru REFCLKO25M_ETH1_OUT>;
+
+        pinctrl-names = "default";
+        pinctrl-0 = <&gmac1_miim
+                     &gmac1_tx_bus2
+                     &gmac1_rx_bus2
+                     &gmac1_rgmii_clk
+-                    &gmac1_rgmii_bus
+-                    &eth1_pins>;
++                    &gmac1_rgmii_bus>;
++                    &eth1_pins>;
+ 
+        tx_delay = <0x43>;
+        /* rx_delay = <0x3f>; */
+@@ -510,23 +521,32 @@ &i2s0_sclk
+
++&pcie2x1l0 {
++//     phys = <&combphy1_ps PHY_TYPE_PCIE>;
++       reset-gpios = <&gpio3 RK_PB7 GPIO_ACTIVE_HIGH>;
++       status = "okay";
++};
++
++&pcie2x1l2 {
++       reset-gpios = <&gpio4 RK_PC1 GPIO_ACTIVE_HIGH>;
++       vpcie3v3-supply = <&vcc3v3_pcie30>;
++        status = "okay";
++};
+
+2. Kernel dmesg:
+
+[    1.796094] rk-pcie fe190000.pcie: invalid prsnt-gpios property in node
+[    1.796284] rk-pcie fe170000.pcie: invalid prsnt-gpios property in node
+[    1.796311] rk-pcie fe170000.pcie: no vpcie3v3 regulator found
+[    1.796455] pwm-backlight backlight: supply power not found, using dummy regulator
+[    1.796474] rk-pcie fe170000.pcie: missing legacy IRQ resource
+[    1.796486] rk-pcie fe170000.pcie: IRQ msi not found
+[    1.796491] rk-pcie fe170000.pcie: use outband MSI support
+[    1.796496] rk-pcie fe170000.pcie: Missing *config* reg space
+[    1.796505] rk-pcie fe170000.pcie: host bridge /pcie@fe170000 ranges:
+[    1.796547] rk-pcie fe170000.pcie:      err 0x00f2000000..0x00f20fffff -> 0x00f2000000
+[    1.796557] rk-pcie fe170000.pcie:       IO 0x00f2100000..0x00f21fffff -> 0x00f2100000
+[    1.796567] rk-pcie fe170000.pcie:      MEM 0x00f2200000..0x00f2ffffff -> 0x00f2200000
+[    1.796575] rk-pcie fe170000.pcie:      MEM 0x0980000000..0x09bfffffff -> 0x0980000000
+[    1.796604] rk-pcie fe170000.pcie: Missing *config* reg space
+[    1.796633] rk-pcie fe170000.pcie: invalid resource
+[    1.801809] rk-pcie fe190000.pcie: missing legacy IRQ resource
+[    1.801832] rk-pcie fe190000.pcie: IRQ msi not found
+[    1.801842] rk-pcie fe190000.pcie: use outband MSI support
+[    1.801851] rk-pcie fe190000.pcie: Missing *config* reg space
+[    1.801869] rk-pcie fe190000.pcie: host bridge /pcie@fe190000 ranges:
+[    1.801903] rk-pcie fe190000.pcie:      err 0x00f4000000..0x00f40fffff -> 0x00f4000000
+[    1.801924] rk-pcie fe190000.pcie:       IO 0x00f4100000..0x00f41fffff -> 0x00f4100000
+[    1.801935] mpp-iep2 fdbb0000.iep: Adding to iommu group 9
+[    1.801946] rk-pcie fe190000.pcie:      MEM 0x00f4200000..0x00f4ffffff -> 0x00f4200000
+[    1.801962] rk-pcie fe190000.pcie:      MEM 0x0a00000000..0x0a3fffffff -> 0x0a00000000
+[    1.801997] rk-pcie fe190000.pcie: Missing *config* reg space
+[    1.802032] rk-pcie fe190000.pcie: invalid resource
+
+[    2.057040] rk-pcie fe170000.pcie: PCIe Link up, LTSSM is 0x130011
+[    2.057050] rk-pcie fe170000.pcie: ltssm = 0x130011
+[    2.057056] rk-pcie fe170000.pcie: fifo_status = 0x140000
+[    2.057139] rk-pcie fe170000.pcie: PCI host bridge to bus 0002:20
+[    2.057149] pci_bus 0002:20: root bus resource [bus 20-2f]
+[    2.057157] pci_bus 0002:20: root bus resource [??? 0xf2000000-0xf20fffff flags 0x0]
+[    2.057166] pci_bus 0002:20: root bus resource [io  0x0000-0xfffff] (bus address [0xf2100000-0xf21fffff])
+[    2.057173] pci_bus 0002:20: root bus resource [mem 0xf2200000-0xf2ffffff]
+[    2.057179] pci_bus 0002:20: root bus resource [mem 0x980000000-0x9bfffffff pref]
+[    2.057206] pci 0002:20:00.0: [1d87:3588] type 01 class 0x060400
+[    2.057225] pci 0002:20:00.0: reg 0x38: [mem 0x00000000-0x0000ffff pref]
+[    2.057271] pci 0002:20:00.0: supports D1 D2
+[    2.057278] pci 0002:20:00.0: PME# supported from D0 D1 D3hot
+[    2.062476] pci 0002:20:00.0: Primary bus is hard wired to 0
+[    2.062486] pci 0002:20:00.0: bridge configuration invalid ([bus 01-ff]), reconfiguring
+[    2.062650] pci 0002:21:00.0: [10ec:8125] type 00 class 0x020000
+[    2.062704] pci 0002:21:00.0: reg 0x10: initial BAR value 0x00000000 invalid
+[    2.062711] pci 0002:21:00.0: reg 0x10: [io  size 0x0100]
+[    2.062776] pci 0002:21:00.0: reg 0x18: [mem 0x00000000-0x0000ffff 64bit]
+[    2.062820] pci 0002:21:00.0: reg 0x20: [mem 0x00000000-0x00003fff 64bit]
+[    2.063180] pci 0002:21:00.0: supports D1 D2
+[    2.063187] pci 0002:21:00.0: PME# supported from D0 D1 D2 D3hot D3cold
+[    2.075411] pci_bus 0002:21: busn_res: [bus 21-2f] end is updated to 21
+[    2.075434] pci 0002:20:00.0: BAR 8: assigned [mem 0xf2200000-0xf22fffff]
+[    2.075442] pci 0002:20:00.0: BAR 6: assigned [mem 0xf2300000-0xf230ffff pref]
+[    2.075450] pci 0002:20:00.0: BAR 7: assigned [io  0x1000-0x1fff]
+[    2.075460] pci 0002:21:00.0: BAR 2: assigned [mem 0xf2200000-0xf220ffff 64bit]
+[    2.075497] pci 0002:21:00.0: BAR 4: assigned [mem 0xf2210000-0xf2213fff 64bit]
+[    2.075533] pci 0002:21:00.0: BAR 0: assigned [io  0x1000-0x10ff]
+[    2.075548] pci 0002:20:00.0: PCI bridge to [bus 21]
+[    2.075555] pci 0002:20:00.0:   bridge window [io  0x1000-0x1fff]
+[    2.075562] pci 0002:20:00.0:   bridge window [mem 0xf2200000-0xf22fffff]
+[    2.077214] pcieport 0002:20:00.0: PME: Signaling with IRQ 144
+
+[    2.090396] rk-pcie fe190000.pcie: PCIe Link up, LTSSM is 0x130011
+[    2.090420] rk-pcie fe190000.pcie: ltssm = 0x130011
+[    2.090433] rk-pcie fe190000.pcie: fifo_status = 0x130001
+[    2.090595] rk-pcie fe190000.pcie: PCI host bridge to bus 0004:40
+[    2.090612] pci_bus 0004:40: root bus resource [bus 40-4f]
+[    2.090626] pci_bus 0004:40: root bus resource [??? 0xf4000000-0xf40fffff flags 0x0]
+[    2.090647] pci_bus 0004:40: root bus resource [io  0x100000-0x1fffff] (bus address [0xf4100000-0xf41fffff])
+[    2.090661] pci_bus 0004:40: root bus resource [mem 0xf4200000-0xf4ffffff]
+[    2.090675] pci_bus 0004:40: root bus resource [mem 0xa00000000-0xa3fffffff pref]
+[    2.090716] pci 0004:40:00.0: [1d87:3588] type 01 class 0x060400
+[    2.090748] pci 0004:40:00.0: reg 0x38: [mem 0x00000000-0x0000ffff pref]
+[    2.090819] pci 0004:40:00.0: supports D1 D2
+[    2.090832] pci 0004:40:00.0: PME# supported from D0 D1 D3hot
+[    2.097801] usb usb3: New USB device found, idVendor=1d6b, idProduct=0001, bcdDevice= 5.10
+[    2.097812] usb usb3: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[    2.097818] usb usb3: Product: Generic Platform OHCI controller
+[    2.097825] usb usb3: Manufacturer: Linux 5.10.110-rockchip-standard ohci_hcd
+[    2.097831] usb usb3: SerialNumber: fc840000.usb
+[    2.099210] hub 3-0:1.0: USB hub found
+[    2.099231] hub 3-0:1.0: 1 port detected
+[    2.100711] pci 0004:40:00.0: Primary bus is hard wired to 0
+[    2.100729] pci 0004:40:00.0: bridge configuration invalid ([bus 01-ff]), reconfiguring
+[    2.100854] ohci-platform fc8c0000.usb: Generic Platform OHCI controller
+[    2.100949] ohci-platform fc8c0000.usb: new USB bus registered, assigned bus number 4
+[    2.100968] pci 0004:41:00.0: [144d:a808] type 00 class 0x010802
+[    2.101000] ohci-platform fc8c0000.usb: irq 22, io mem 0xfc8c0000
+[    2.101054] pci 0004:41:00.0: reg 0x10: [mem 0x00000000-0x00003fff 64bit]
+[    2.101626] pci 0004:41:00.0: 4.000 Gb/s available PCIe bandwidth, limited by 5.0 GT/s PCIe x1 link at 0004:40:00.0 (capable of 31.504 Gb/s with 8.0 GT/s PCIe x4 link)
+[    2.120045] pci_bus 0004:41: busn_res: [bus 41-4f] end is updated to 41
+[    2.120089] pci 0004:40:00.0: BAR 8: assigned [mem 0xf4200000-0xf42fffff]
+[    2.120108] pci 0004:40:00.0: BAR 6: assigned [mem 0xf4300000-0xf430ffff pref]
+[    2.120127] pci 0004:41:00.0: BAR 0: assigned [mem 0xf4200000-0xf4203fff 64bit]
+[    2.120174] pci 0004:40:00.0: PCI bridge to [bus 41]
+[    2.120189] pci 0004:40:00.0:   bridge window [mem 0xf4200000-0xf42fffff]
+[    2.123232] pcieport 0004:40:00.0: PME: Signaling with IRQ 154
+[    2.123680] nvme nvme0: pci function 0004:41:00.0
+[    2.123766] nvme 0004:41:00.0: enabling device (0000 -> 0002)
+
+[    3.770153] r8169 0002:21:00.0: enabling device (0000 -> 0003)
+[    3.792410] r8169 0002:21:00.0 eth0: RTL8125B, d6:7b:af:9d:a2:56, XID 641, IRQ 167
+[    3.792417] r8169 0002:21:00.0 eth0: jumbo features [frames: 9194 bytes, tx checksumming: ko]
+[    4.298511] r8169 0002:21:00.0: Direct firmware load for rtl_nic/rtl8125b-2.fw failed with error -2
+[    4.298542] r8169 0002:21:00.0: Unable to load firmware rtl_nic/rtl8125b-2.fw (-2)
+[    4.324047] RTL8226B_RTL8221B 2.5Gbps PHY r8169-2-2100:00: attached PHY driver [RTL8226B_RTL8221B 2.5Gbps PHY] (mii_bus:phy_addr=r8169-2-2100:00, irq=IGNORE)
+[    4.444285] r8169 0002:21:00.0 eth0: Link is Down
+[    8.132663] r8169 0002:21:00.0 eth0: Link is Up - 2.5Gbps/Full - flow control rx/tx
+
+3. Display PCIe devices:
+
+root@rcv-rk3588:~# lspci -v
+0002:20:00.0 PCI bridge: Fuzhou Rockchip Electronics Co., Ltd Device 3588 (rev 01) (prog-if 00 [Normal decode])
+        Flags: bus master, fast devsel, latency 0, IRQ 136
+        Bus: primary=20, secondary=21, subordinate=21, sec-latency=0
+        I/O behind bridge: 00001000-00001fff [size=4K]
+        Memory behind bridge: f2200000-f22fffff [size=1M]
+        Prefetchable memory behind bridge: [disabled]
+        Expansion ROM at f2300000 [virtual] [disabled] [size=64K]
+        Capabilities: [40] Power Management version 3
+        Capabilities: [50] MSI: Enable+ Count=16/32 Maskable- 64bit+
+        Capabilities: [70] Express Root Port (Slot-), MSI 08
+        Capabilities: [b0] MSI-X: Enable- Count=128 Masked-
+        Capabilities: [100] Advanced Error Reporting
+        Capabilities: [148] Secondary PCI Express
+        Capabilities: [180] L1 PM Substates
+        Capabilities: [190] Vendor Specific Information: ID=0002 Rev=4 Len=100 <?>
+        Kernel driver in use: pcieport
+
+0002:21:00.0 Ethernet controller: Realtek Semiconductor Co., Ltd. RTL8125 2.5GbE Controller (rev 04)
+        Subsystem: Realtek Semiconductor Co., Ltd. RTL8125 2.5GbE Controller
+        Flags: bus master, fast devsel, latency 0, IRQ 135
+        I/O ports at 1000 [size=256]
+        Memory at f2200000 (64-bit, non-prefetchable) [size=64K]
+        Memory at f2210000 (64-bit, non-prefetchable) [size=16K]
+        Capabilities: [40] Power Management version 3
+        Capabilities: [50] MSI: Enable- Count=1/1 Maskable+ 64bit+
+        Capabilities: [70] Express Endpoint, MSI 01
+        Capabilities: [b0] MSI-X: Enable+ Count=32 Masked-
+        Capabilities: [d0] Vital Product Data
+        Capabilities: [100] Advanced Error Reporting
+        Capabilities: [148] Virtual Channel
+        Capabilities: [168] Device Serial Number 00-00-00-00-00-00-00-00
+        Capabilities: [178] Transaction Processing Hints
+        Capabilities: [204] Latency Tolerance Reporting
+        Capabilities: [20c] L1 PM Substates
+        Capabilities: [21c] Vendor Specific Information: ID=0002 Rev=4 Len=100 <?>
+        Kernel driver in use: r8169
+        Kernel modules: r8169
+
+0004:40:00.0 PCI bridge: Fuzhou Rockchip Electronics Co., Ltd Device 3588 (rev 01) (prog-if 00 [Normal decode])
+        Flags: bus master, fast devsel, latency 0, IRQ 146
+        Bus: primary=40, secondary=41, subordinate=41, sec-latency=0
+        I/O behind bridge: [disabled]
+        Memory behind bridge: f4200000-f42fffff [size=1M]
+        Prefetchable memory behind bridge: [disabled]
+        Expansion ROM at f4300000 [virtual] [disabled] [size=64K]
+        Capabilities: [40] Power Management version 3
+        Capabilities: [50] MSI: Enable+ Count=16/32 Maskable- 64bit+
+        Capabilities: [70] Express Root Port (Slot-), MSI 08
+        Capabilities: [b0] MSI-X: Enable- Count=128 Masked-
+        Capabilities: [100] Advanced Error Reporting
+        Capabilities: [148] Secondary PCI Express
+        Capabilities: [180] L1 PM Substates
+        Capabilities: [190] Vendor Specific Information: ID=0002 Rev=4 Len=100 <?>
+        Kernel driver in use: pcieport
+
+0004:41:00.0 Non-Volatile memory controller: Samsung Electronics Co Ltd NVMe SSD Controller SM981/PM981/PM983 (prog-if 02 [NVM Express])
+        Subsystem: Samsung Electronics Co Ltd Device a801
+        Flags: bus master, fast devsel, latency 0, IRQ 145
+        Memory at f4200000 (64-bit, non-prefetchable) [size=16K]
+        Capabilities: [40] Power Management version 3
+        Capabilities: [50] MSI: Enable- Count=1/32 Maskable- 64bit+
+        Capabilities: [70] Express Endpoint, MSI 00
+        Capabilities: [b0] MSI-X: Enable+ Count=33 Masked-
+        Capabilities: [100] Advanced Error Reporting
+        Capabilities: [148] Device Serial Number 00-00-00-00-00-00-00-00
+        Capabilities: [158] Power Budgeting <?>
+        Capabilities: [168] Secondary PCI Express
+        Capabilities: [188] Latency Tolerance Reporting
+        Capabilities: [190] L1 PM Substates
+        Kernel driver in use: nvme
+
+4. Realtek firmware update:
+
+# scp rtl8125b-2.fw {id}@{ip}:/lib/firmware/rtl_nic/rtl8125b-2.fw
+
+[    4.243218] RTL8226B_RTL8221B 2.5Gbps PHY r8169-2-2100:00: attached PHY driver [RTL8226B_RTL8221B 2.5Gbps PHY] (mii_bus:phy_addr=r8169-2-2100:00, irq=IGNORE)
+[    4.284491] rk_hdmirx fdee0000.hdmirx-controller: hdmirx_cancel_cpu_limit_freq freq qos nod add
+[    4.433342] r8169 0002:21:00.0 eth0: Link is Down
+[    4.703344] rk-pcie fe190000.pcie: PCIe Link Fail
+[    4.703437] rk-pcie fe190000.pcie: failed to initialize host
+[    8.172164] r8169 0002:21:00.0 eth0: Link is Up - 2.5Gbps/Full - flow control rx/tx
+[    8.172305] IPv6: ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready
+
+5. 2.5Gbps Performance test:
+
+C:\Users\yunjae.lim\Documents\Temp\iperf-3.1.3-win64>iperf3.exe -s
+-----------------------------------------------------------
+Server listening on 5201
+-----------------------------------------------------------
+Accepted connection from 192.168.0.3, port 38416
+[  5] local 192.168.0.2 port 5201 connected to 192.168.0.3 port 38418
+[ ID] Interval           Transfer     Bandwidth
+[  5]   0.00-1.00   sec   254 MBytes  2.13 Gbits/sec
+[  5]   1.00-2.00   sec   282 MBytes  2.37 Gbits/sec
+[  5]   2.00-3.00   sec   245 MBytes  2.05 Gbits/sec
+[  5]   3.00-4.00   sec   253 MBytes  2.12 Gbits/sec
+[  5]   4.00-5.00   sec   274 MBytes  2.30 Gbits/sec
+[  5]   5.00-6.00   sec   273 MBytes  2.29 Gbits/sec
+[  5]   6.00-7.00   sec   283 MBytes  2.37 Gbits/sec
+[  5]   7.00-8.00   sec   273 MBytes  2.29 Gbits/sec
+[  5]   8.00-9.00   sec   274 MBytes  2.30 Gbits/sec
+[  5]   9.00-10.00  sec   283 MBytes  2.37 Gbits/sec
+[  5]  10.00-10.00  sec   322 KBytes  2.33 Gbits/sec
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth
+[  5]   0.00-10.00  sec  0.00 Bytes  0.00 bits/sec                  sender
+[  5]   0.00-10.00  sec  2.63 GBytes  2.26 Gbits/sec                  receiver
+
+root@device-rk3588:~# iperf3 -c 192.168.0.2
+Connecting to host 192.168.0.2, port 5201
+[  5] local 192.168.0.3 port 38418 connected to 192.168.0.2 port 5201
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5]   0.00-1.00   sec   255 MBytes  2.14 Gbits/sec    0    412 KBytes
+[  5]   1.00-2.00   sec   283 MBytes  2.37 Gbits/sec    0    412 KBytes
+[  5]   2.00-3.00   sec   244 MBytes  2.05 Gbits/sec    0    412 KBytes
+[  5]   3.00-4.00   sec   253 MBytes  2.12 Gbits/sec   83    288 KBytes
+[  5]   4.00-5.00   sec   274 MBytes  2.30 Gbits/sec    0    288 KBytes
+[  5]   5.00-6.00   sec   273 MBytes  2.29 Gbits/sec    0    288 KBytes
+[  5]   6.00-7.00   sec   283 MBytes  2.37 Gbits/sec    0    288 KBytes
+[  5]   7.00-8.00   sec   273 MBytes  2.29 Gbits/sec    0    288 KBytes
+[  5]   8.00-9.00   sec   274 MBytes  2.30 Gbits/sec    0    288 KBytes
+[  5]   9.00-10.00  sec   283 MBytes  2.37 Gbits/sec    0    288 KBytes
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-10.00  sec  2.63 GBytes  2.26 Gbits/sec   83             sender
+[  5]   0.00-10.00  sec  2.63 GBytes  2.26 Gbits/sec                  receiver
+
+iperf Done.
