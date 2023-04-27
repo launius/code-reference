@@ -1,0 +1,265 @@
+/*
+ * (c) 2023 Yunjae Lim <launius@gmail.com>
+ *
+ * Audio tools for DAC & ADC on Linux
+ */
+
+------ Speaker Test -----
+# speaker-test -Dhw:0,0 -c 8 -F S32_LE -f 440 -t wav -l 1
+# speaker-test -D plughw:0,0 -c 8 -t wav -l 1
+
+root@rcv-rk3588:~# speaker-test -Dhw:0,0 -c 8 -t wav -l 1
+
+speaker-test 1.2.5.1
+
+Playback device is hw:0,0
+Stream parameters are 48000Hz, S16_LE, 8 channels
+WAV file(s)
+Rate set to 48000Hz (requested 48000Hz)
+Buffer size range from 32 to 32768
+Period size range from 16 to 16384
+Using max buffer size 32768
+Periods = 4
+was set period_size = 8192
+was set buffer_size = 32768
+ 0 - Front Left
+ 4 - Center
+ 1 - Front Right
+ 7 - Side Right
+ 3 - Rear Right
+ 2 - Rear Left
+ 6 - Side Left
+ 5 - LFE
+Time per period = 10.756766
+
+------ Audio Play -----
+# aplay -v -f S32_LE -r 48000 -c 2 -Dhw:0,0 /dev/zero
+# aplay -v -f S32_LE -r 48000 -c 2 -Dhw:0,0 /dev/urandom
+
+root@rcv-rk3588:~# aplay -v -D plughw:0,0 /usr/share/sounds/alsa/Front_Center.wav
+Playing WAVE '/usr/share/sounds/alsa/Front_Center.wav' : Signed 16 bit Little Endian, Rate 48000 Hz, Mono
+Plug PCM: Route conversion PCM (sformat=S16_LE)
+  Transformation table:
+    0 <- 0
+    1 <- 0
+Its setup is:
+  stream       : PLAYBACK
+  access       : RW_INTERLEAVED
+  format       : S16_LE
+  subformat    : STD
+  channels     : 1
+  rate         : 48000
+  exact rate   : 48000 (48000/1)
+  msbits       : 16
+  buffer_size  : 24000
+  period_size  : 6000
+  period_time  : 125000
+  tstamp_mode  : NONE
+  tstamp_type  : MONOTONIC
+  period_step  : 1
+  avail_min    : 6000
+  period_event : 0
+  start_threshold  : 24000
+  stop_threshold   : 24000
+  silence_threshold: 0
+  silence_size : 0
+  boundary     : 6755399441055744000
+Slave: Hardware PCM card 0 'fe480000.i2s-pcm1681-hifi' device 0 subdevice 0
+Its setup is:
+  stream       : PLAYBACK
+  access       : MMAP_INTERLEAVED
+  format       : S16_LE
+  subformat    : STD
+  channels     : 2
+  rate         : 48000
+  exact rate   : 48000 (48000/1)
+  msbits       : 16
+  buffer_size  : 24000
+  period_size  : 6000
+  period_time  : 125000
+  tstamp_mode  : NONE
+  tstamp_type  : MONOTONIC
+  period_step  : 1
+  avail_min    : 6000
+  period_event : 0
+  start_threshold  : 24000
+  stop_threshold   : 24000
+  silence_threshold: 0
+  silence_size : 0
+  boundary     : 6755399441055744000
+  appl_ptr     : 0
+  hw_ptr       : 0
+
+------ Audio Record & Play, Loopback -----
+# arecord -r 48000 -f S32_LE -D plughw:0,1 -d 10 -c 4 /tmp/record.wav
+# aplay -v -D plughw:0,0 /tmp/record.wav
+# aplay -v -D hw:0,0 /tmp/record.wav
+
+root@rcv-rk3588:~# arecord -v -r 48000 -f S32_LE -D hw:0,1 -d 10 -c 4 /tmp/record.wav
+Recording WAVE '/tmp/record.wav' : Signed 32 bit Little Endian, Rate 48000 Hz, Channels 4
+Hardware PCM card 0 'fe480000.i2s-pcm1681-hifi' device 1 subdevice 0
+Its setup is:
+  stream       : CAPTURE
+  access       : RW_INTERLEAVED
+  format       : S32_LE
+  subformat    : STD
+  channels     : 4
+  rate         : 48000
+  exact rate   : 48000 (48000/1)
+  msbits       : 32
+  buffer_size  : 24000
+  period_size  : 6000
+  period_time  : 125000
+  tstamp_mode  : NONE
+  tstamp_type  : MONOTONIC
+  period_step  : 1
+  avail_min    : 6000
+  period_event : 0
+  start_threshold  : 1
+  stop_threshold   : 24000
+  silence_threshold: 0
+  silence_size : 0
+  boundary     : 6755399441055744000
+  appl_ptr     : 0
+  hw_ptr       : 0
+
+root@rcv-rk3588:~# arecord -r 48000 -f S32_LE -D hw:0,1 -c 4 | aplay -v -D hw:0,0
+Recording WAVE 'stdin' : Signed 32 bit Little Endian, Rate 48000 Hz, Channels 4
+Playing WAVE 'stdin' : Signed 32 bit Little Endian, Rate 48000 Hz, Channels 4
+Hardware PCM card 0 'fe480000.i2s-pcm1681-hifi' device 0 subdevice 0
+Its setup is:
+  stream       : PLAYBACK
+  access       : RW_INTERLEAVED
+  format       : S32_LE
+  subformat    : STD
+  channels     : 4
+  rate         : 48000
+  exact rate   : 48000 (48000/1)
+  msbits       : 32
+  buffer_size  : 24000
+  period_size  : 6000
+  period_time  : 125000
+  tstamp_mode  : NONE
+  tstamp_type  : MONOTONIC
+  period_step  : 1
+  avail_min    : 6000
+  period_event : 0
+  start_threshold  : 24000
+  stop_threshold   : 24000
+  silence_threshold: 0
+  silence_size : 0
+  boundary     : 6755399441055744000
+  appl_ptr     : 0
+  hw_ptr       : 0
+
+------ Audio Mixer Contents & Controls -----
+root@rcv-rk3588:~# amixer -c 0 scontents
+Simple mixer control 'I2STDM Digital Loopback Mode',0
+  Capabilities: enum
+  Items: 'Disabled' 'Mode1' 'Mode2' 'Mode2 Swap'
+  Item0: 'Disabled'
+Simple mixer control 'U8 Dynamic Range Enhancer',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'U8 Low Latency Filters',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [on]
+Simple mixer control 'U9 Channel 1/2',0
+  Capabilities: pvolume
+  Playback channels: Front Left - Front Right
+  Limits: Playback 0 - 127
+  Mono:
+  Front Left: Playback 119 [94%] [-4.00dB]
+  Front Right: Playback 119 [94%] [-4.00dB]
+Simple mixer control 'U9 Channel 3/4',0
+  Capabilities: pvolume
+  Playback channels: Front Left - Front Right
+  Limits: Playback 0 - 127
+  Mono:
+  Front Left: Playback 127 [100%] [0.00dB]
+  Front Right: Playback 127 [100%] [0.00dB]
+Simple mixer control 'U9 Channel 5/6',0
+  Capabilities: pvolume
+  Playback channels: Front Left - Front Right
+  Limits: Playback 0 - 127
+  Mono:
+  Front Left: Playback 127 [100%] [0.00dB]
+  Front Right: Playback 127 [100%] [0.00dB]
+Simple mixer control 'U9 Channel 7/8',0
+  Capabilities: pvolume
+  Playback channels: Front Left - Front Right
+  Limits: Playback 0 - 127
+  Mono:
+  Front Left: Playback 127 [100%] [0.00dB]
+  Front Right: Playback 127 [100%] [0.00dB]
+Simple mixer control 'U9 De-emphasis',0
+  Capabilities: pswitch pswitch-joined
+  Playback channels: Mono
+  Mono: Playback [off]
+
+root@rcv-rk3588:~# amixer -c 0 controls
+numid=1,iface=MIXER,name='I2STDM Digital Loopback Mode'
+numid=8,iface=MIXER,name='U8 Dynamic Range Enhancer Switch'
+numid=7,iface=MIXER,name='U8 Low Latency Filters Switch'
+numid=2,iface=MIXER,name='U9 Channel 1/2 Playback Volume'
+numid=3,iface=MIXER,name='U9 Channel 3/4 Playback Volume'
+numid=4,iface=MIXER,name='U9 Channel 5/6 Playback Volume'
+numid=5,iface=MIXER,name='U9 Channel 7/8 Playback Volume'
+numid=6,iface=MIXER,name='U9 De-emphasis Switch'
+
+# amixer -c 0 sset 'U9 Channel 1/2' 70% unmute
+# amixer -c 0 sset 'U9 Channel 1/2',0 100% 100% on
+# amixer -D pulse sset Master 10%+
+# amixer set Master mute
+# alsamixer -c 0
+
+------ Gain Control -----
+# echo 0 > /sys/devices/platform/ff560000.audio-codec/acodec-dev/dac_output
+# echo 15 > /sys/devices/platform/fead0000.i2c/i2c-5/5-0013/driver-name/gain_ch1
+
+------ JACK Audio Connection Kit -----
+root@rcv-rk3588:~# jackd -dalsa -C hw:0,1 -P hw:0,0 -r 48000
+jackdmp 1.9.19
+Copyright 2001-2005 Paul Davis and others.
+Copyright 2004-2016 Grame.
+Copyright 2016-2021 Filipe Coelho.
+jackdmp comes with ABSOLUTELY NO WARRANTY
+This is free software, and you are welcome to redistribute it
+under certain conditions; see the file COPYING for details
+JACK server starting in realtime mode with priority 10
+self-connect-mode is "Don't restrict self connect requests"
+creating alsa driver ... hw:0,0|hw:0,1|1024|2|48000|0|0|nomon|swmeter|-|32bit
+configuring for 48000Hz, period = 1024 frames (21.3 ms), buffer = 2 periods
+ALSA: final selected sample format for capture: 32bit integer little-endian
+ALSA: use 2 periods for capture
+ALSA: final selected sample format for playback: 32bit integer little-endian
+ALSA: use 2 periods for playback
+
+# jackd -dalsa -C hw:0,1 -P hw:0,0 -r 48000 -p128 &
+# jackd --port-max 100 -P 51 -d alsa -C hw:0,1 -P hw:0,0 -r 48000 -p 112
+
+root@rcv-rk3588:~# jack_lsp -c
+system:capture_1
+system:capture_2
+system:capture_3
+system:capture_4
+system:playback_1
+system:playback_2
+system:playback_3
+system:playback_4
+system:playback_5
+system:playback_6
+system:playback_7
+system:playback_8
+
+# jack_connect system:capture_1 system:playback_1
+# jack_connect system:capture_2 system:playback_2
+# jack_connect system:capture_1 system:playback_3
+# jack_connect system:capture_2 system:playback_4
+
+------ PulseAudio -----
+# pulseaudio --start
+# pactl set-card-profile 0 output:stereo-fallback
+# aplay -v /usr/share/sounds/alsa/*.wav
