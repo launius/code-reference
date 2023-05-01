@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--Copyright (C) 2023 Yunjae Lim, launius@gmail.com-->
+
+<manifest>
+  <remote name="cv" fetch="ssh://git@www.chipvendor.com/linux/"/>
+  <remote name="oe" fetch="git://git.openembedded.org"/>
+  <remote name="yocto" fetch="git://git.yoctoproject.org"/>
+  <remote name="my" fetch="ssh://git@github.com/launius/"/>
+  <default revision="master" sync-c="true" sync-j="8"/>
+
+  <project name="linux/build" path="build/conf" remote="cv" revision="kirkstone" clone-depth="1"/>
+  <project name="linux/tools" path="tools" remote="cv" revision="refs/tags/linux-5.10-tag" clone-depth="1"/>
+  <project name="meta-openembedded" dest-branch="master" remote="oe" revision="a9e6d16e6640d105ecf3470ab891598034c9ef33"/>
+  <project name="poky" dest-branch="master" remote="yocto" revision="fdda6460c0821b194fd93baed9d2affbb6d4035b">
+    <linkfile src="scripts" dest="scripts"/>
+    <linkfile src="bitbake" dest="bitbake"/>
+    <linkfile src="meta-poky" dest="meta-poky"/>
+    <linkfile src=".templateconf" dest=".templateconf"/>
+    <linkfile src="oe-init-build-env" dest="oe-init-build-env"/>
+  </project>
+  <project name="meta-layer" path="meta-layer" remote="my" revision="kirk-branch"/>
+</manifest>
