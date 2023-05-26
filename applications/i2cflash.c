@@ -4,24 +4,21 @@
  * Firmware update for internal MCU using external I2C
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/ioctl.h>
-
-#include <linux/i2c.h>
-#include <linux/i2c-dev.h>
+#include "i2cflash.h"
 
 #define DEBUG
 
-unsigned int bySpiLen = 31;
+static const unsigned int bySpiLen = 31;
 
-static inline int i2c_write(int file, unsigned char *buf, int size)
+int i2c_read(int fd, uint8_t *buf, size_t size)
 {
-	if (write(file, buf, size) != size) {
-		printf("%s: failed %d\n", __func__, size);
+	return read(fd, buf, size);
+}
+
+int i2c_write(int fd, uint8_t *buf, size_t size)
+{
+	if (write(fd, buf, size) != size) {
+		print_error("write failed %lu\n", size);
 		return -1;
 	}
 
@@ -51,9 +48,9 @@ int check_chip_id(int file)
 		printf("read error\n");
 		return -1;
 	}
-	
+
 	chip_id = (buf[0] << 8) | buf[1];
-	printf("%s: 0x%02x 0x%02x, 0x%x\n", __func__, buf[0], buf[1], chip_id);
+	print_debug("0x%02x 0x%02x, 0x%x\n", buf[0], buf[1], chip_id);
 
 	return (chip_id == 0x2003);
 }
@@ -82,7 +79,7 @@ int config_settings(int file)
 	return 0;
 }
 
-int erase_block(int file)
+int erase_block(int file, bool backup)
 {
 	unsigned int erase_addr = 0;
 	unsigned char buf[2];
@@ -90,7 +87,10 @@ int erase_block(int file)
 	int i;
 
 	for (i = 0 ; i < 2 ; i++) {
-		erase_addr = (i == 1) ? 0x8000 : 0;
+		if (!backup)
+			erase_addr = (i == 1) ? 0x008000 : 0x000000;
+		else
+			erase_addr = (i == 1) ? 0x048000 : 0x040000;	// backup addr
 
 		buf[0] = 0x5a;	buf[1] = 0x04;
 		i2c_write(file, buf, 2);
@@ -125,11 +125,11 @@ int erase_block(int file)
 	return 0;
 }
 
-int program_firmware(int file, char *prog_data, unsigned int data_len)
+int program_firmware(int file, unsigned char *prog_data, unsigned int data_len, bool backup)
 {
 	unsigned int m_block = 256;
 	unsigned int write_addr = 0;
-	unsigned char addr[3] = {0,};
+	unsigned char addr[3] = {0, 0, 0};
 
 	int start_block;
 	int num_blocks;
@@ -137,6 +137,9 @@ int program_firmware(int file, char *prog_data, unsigned int data_len)
 	int i;
 	unsigned char buf[2];
 	unsigned char write_data[32 + 1] = {0,};
+
+	if (backup)
+		write_addr = 0x040000;		// backup addr
 
 	addr[0] = (write_addr & 0xFF0000) >> 16;
 	addr[1] = (write_addr & 0xFF00) >> 8;
@@ -258,14 +261,17 @@ int program_firmware(int file, char *prog_data, unsigned int data_len)
 	return 0;
 }
 
-int read_firmware(int file, char *read_data, unsigned int read_len)
+int read_firmware(int file, unsigned char *read_data, unsigned int read_len, bool backup)
 {
 	unsigned int read_addr = 0;
-	unsigned char addr[3] = {0,};
+	unsigned char addr[3] = {0, 0, 0};
 
 	unsigned char buf[2];
 	unsigned char cur_read_data[32] = {0,};
 	int cur_read_len;
+
+	if(backup)
+		read_addr = 0x040000;		// backup addr
 
 	addr[0] = (read_addr & 0xFF0000) >> 16;
 	addr[1] = (read_addr & 0xFF00) >> 8;
@@ -275,7 +281,7 @@ int read_firmware(int file, char *read_data, unsigned int read_len)
 
 	if(read_len % 32 != 0)
 		++n_page;
-	
+
 	for (int i = 0 ; i < n_page ; ++i) {
 		buf[0] = 0xff;	buf[1] = 0xe0;
 		i2c_write(file, buf, 2);
@@ -347,13 +353,13 @@ int read_firmware(int file, char *read_data, unsigned int read_len)
 	return 0;
 }
 
-int load_firmware(char *filename, char **data, char **result, int *size)
+int load_firmware(char *filename, unsigned char **data, unsigned char **result, int *size)
 {
 	FILE *fp;
 
 	fp = fopen(filename, "r");
 	if (fp == NULL) {
-		printf("%s open fail!\n", filename);
+		print_error("%s open fail!\n", filename);
 		return -1;
 	}
 
@@ -361,8 +367,8 @@ int load_firmware(char *filename, char **data, char **result, int *size)
 	*size = ftell(fp);
 	fseek(fp, 0L, SEEK_SET);
 
-	*data = (char *)calloc(*size, sizeof(char));
-	*result = (char *)calloc(*size, sizeof(char));
+	*data = (unsigned char *)calloc(*size, sizeof(char));
+	*result = (unsigned char *)calloc(*size, sizeof(char));	//TODO: move to reading position
 
 	fread(*data, sizeof(char), *size, fp);
 	fclose(fp);
@@ -370,14 +376,13 @@ int load_firmware(char *filename, char **data, char **result, int *size)
 	return 0;
 }
 
-int save_firmware(char *data, int size)
+int save_firmware(unsigned char *data, int size, char *filename)
 {
 	FILE *fp;
 
-	fp = fopen("/usr/bin/LT86204UX_512K.bin", "w");
-	if (fp == NULL) {
-		printf("LT86204UX_512K.bin open fail\n");
-		return -1;
+	if ((fp = fopen(filename, "w")) == NULL) {
+		print_error("save file open error!");
+		return 1;
 	}
 
 	fwrite(data, sizeof(char), size, fp);
@@ -386,80 +391,202 @@ int save_firmware(char *data, int size)
 	return 0;
 }
 
-int main(int argc, char *argv[])
+void dump_memory(unsigned char *data1, unsigned char *data2, int size)
 {
-	int file;
-	int adapter_nr = 4; /* probably dynamically determined */
-	char filename[20];
-	int addr = 0x38; /* The I2C address */
-
-	int size;
-	char *w_data, *r_data;
 	int i;
 
-	if (argc < 2) {
-		printf("Firmware filename error!\n");
-		exit(1);
+	if (data1) {
+		printf("first n-bytes written of %dbytes:\n", size);
+		for (i = 0 ; i < 500 ; i++)
+			printf("%02x ", data1[i]);
+		printf("\n");
+
+		printf("last n-bytes written:\n");
+		for (i = size - 500 ; i < size ; i++)
+			printf("%02x ", data1[i]);
+		printf("\n");
 	}
 
-	snprintf(filename, 19, "/dev/i2c-%d", adapter_nr);
-	file = open(filename, O_RDWR);
-	if (file < 0) {
-		/* ERROR HANDLING; you can check errno to see what went wrong */
-		exit(1);
+	if (data2) {
+		printf("first n-bytes read:\n");
+		for (i = 0 ; i < 500 ; i++)
+			printf("%02x ", data2[i]);
+		printf("\n");
+
+		printf("last n-bytes read:\n");
+		for (i = size - 500 ; i < size ; i++)
+			printf("%02x ", data2[i]);
+		printf("\n");
 	}
 
-	if (ioctl(file, I2C_SLAVE, addr) < 0) {
-		/* ERROR HANDLING; you can check errno to see what went wrong */
-		exit(1);
+	if (data1 && data2) {
+		if (memcmp(data1, data2, size))
+			print_debug("verification fail\n");
+		else
+			print_debug("verification success\n");
+	}
+}
+
+static int A_Firmware_Extract(int fd, unsigned char *data, int size)
+{
+//	char *data = (char *)calloc(size, sizeof(char));
+
+	if (check_chip_id(fd) != 1) {
+		print_error("check chip ID fail!\n");
+		return 1;
 	}
 
-	if (check_chip_id(file) != 1) {
-		printf("check_chip_id fail\n");
-		close(file);
-		exit(1);
+	read_firmware(fd, data, size, false);
+	save_firmware(data, size, "/usr/bin/firmware.saved");
+
+	return 0;
+}
+
+static int A_Firmware_Upgrade(int fd, unsigned char *w_data, unsigned char *r_data, int size)
+{
+	if (check_chip_id(fd) != 1) {
+		print_error("check chip ID fail!\n");
+		return 1;
 	}
 
-	config_settings(file);
+	config_settings(fd);
 
-	erase_block(file);
+	erase_block(fd, false);
 
-	if (load_firmware(argv[1], &w_data, &r_data, &size))
-		exit(1);
+	program_firmware(fd, w_data, size, false);
 
-	program_firmware(file, w_data, size);
+	read_firmware(fd, r_data, size, false);
 
-	read_firmware(file, r_data, size);
+#ifdef UPDATE_BACKUP_FW
+	config_settings(fd);
+
+	erase_block(fd, true);
+
+	program_firmware(fd, w_data, size, true);
+
+	read_firmware(fd, r_data, size, true);
 
 	if (memcmp(w_data, r_data, size))
-		printf("verification fail\n");
+		print_debug("backup verification fail\n");
 	else
-		printf("verification successful\n");
-
-#ifdef DEBUG
-	printf("written:\n");
-	for (i = 0 ; i < 500 ; i++)
-		printf("%02x ", w_data[i]);
-	printf("\n");
-
-	printf("written:\n");
-	for (i = size - 500 ; i < size ; i++)
-		printf("%02x ", w_data[i]);
-	printf("\n");
-
-	printf("read:\n");
-	for (i = 0 ; i < 500 ; i++)
-		printf("%02x ", r_data[i]);
-	printf("\n");
-
-	printf("read:\n");
-	for (i = size - 500 ; i < size ; i++)
-		printf("%02x ", r_data[i]);
-	printf("\n");
+		print_debug("backup verification success\n");
 #endif
 
-	close(file);
+	return 0;
+}
+
+static void help(void) __attribute__ ((noreturn));
+
+static void help(void)
+{
+	fprintf(stderr, "Usage: i2cflash MODE FIRMWARE-FILE\n"
+				"  MODE is one of:\n"
+				"    1 (HDMI to MIPI1)\n"
+				"    2 (HDMI to MIPI2)\n"
+				"    3 (HDMI to MIPI3)\n"
+				"    4 (HDMI to MIPI4)\n"
+				"    5 (HDMI to MIPI5)\n"
+				"    8 (A, Extract Firmware)\n"
+				"    9 (HDMI Matrix)\n"
+				"    0 (B, Extract Firmware)\n"
+				"  FIRMWARE-FILE is a firmware file name including the path\n"
+				"e.g. # i2cflash 1 /usr/bin/firmware.bin\n");
+	exit(1);
+}
+
+int main(int argc, char *argv[])
+{
+	int flags = 0;
+	char *mode, *fw_file;
+
+	char dev_file[16];
+	int addr;
+	int fd;
+
+	int size;
+	unsigned char *w_data, *r_data;
+
+	if (argc < flags + 3)
+		help();
+
+	mode = argv[flags+1];
+	fw_file = argv[flags+2];
+	print_debug("mode %s, %s flashing...\n", mode, fw_file);
+
+	if (*mode == '1') {
+		snprintf(dev_file, 15, "/dev/i2c-%d", I2CBUS_CHIP_1);
+		addr = 0x2b;
+	}
+	else if (*mode == '2') {
+		snprintf(dev_file, 15, "/dev/i2c-%d", I2CBUS_CHIP_2);
+		addr = 0x2b;
+	}
+	else if (*mode == '3') {
+		snprintf(dev_file, 15, "/dev/i2c-%d", I2CBUS_CHIP_3);
+		addr = 0x2b;
+	}
+	else if (*mode == '4') {
+		snprintf(dev_file, 15, "/dev/i2c-%d", I2CBUS_CHIP_4);
+		addr = 0x2b;
+	}
+	else if (*mode == '5') {
+		snprintf(dev_file, 15, "/dev/i2c-%d", I2CBUS_CHIP_5);
+		addr = 0x2b;
+	}
+	else if (*mode == '7') {
+		snprintf(dev_file, 15, "/dev/i2c-%d", I2CBUS_CHIP_1);
+		addr = 0x2b;
+	}
+	else if (*mode == '8') {
+		snprintf(dev_file, 15, "/dev/i2c-%d", I2CBUS_CHIP_1);
+		addr = 0x2b;
+	}
+	else if (*mode == '9') {
+		snprintf(dev_file, 15, "/dev/i2c-%d", I2CBUS_LTM);
+		addr = 0x38;
+	}
+	else if (*mode == '0') {
+		snprintf(dev_file, 15, "/dev/i2c-%d", I2CBUS_LTM);
+		addr = 0x38;
+	}
+	else
+		help();
+
+	fd = open(dev_file, O_RDWR);
+	if (fd < 0) {
+		fprintf(stderr, "i2c device file open error!\n");
+		exit(1);
+	}
+
+	if (ioctl(fd, I2C_SLAVE, addr) < 0) {
+		fprintf(stderr, "I2C slave address set error!\n");
+		close(fd);
+		exit(1);
+	}
+
+	if (load_firmware(fw_file, &w_data, &r_data, &size)) {
+		close(fd);
+		exit(1);
+	}
+
+	if (*mode == '9')
+		A_Firmware_Upgrade(fd, w_data, r_data, size);
+	else if (*mode == '0')
+		A_Firmware_Extract(fd, r_data, size);
+	else if (*mode == '7')
+		B_Firmware_Extract(fd, r_data, size);
+	else if (*mode == '8')
+		B_Firmware_Extract(fd, NULL, 22336);
+	else
+		B_Firmware_Upgrade(fd, w_data, r_data, size);
+
+#ifdef DEBUG
+	dump_memory(w_data, r_data, size);
+#endif
 
 	free(w_data);
 	free(r_data);
+	close(fd);
+
+	exit(0);
 }
