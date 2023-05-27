@@ -1,7 +1,20 @@
 /*
  * Copyright (c) 2023, Yunjae Lim <launius@gmail.com>
  *
- * Firmware update for internal MCU using external I2C
+ * Firmware update program for internal MCU using external I2C
+ *
+ * This Yocto package includes the files below.
+
+./recipes-apps/
++-- i2cflash
+¦   +-- files
+¦   ¦   +-- firmware.bin
+¦   ¦   +-- src
+¦   ¦       +-- i2cflash.h
+¦   ¦       +-- i2cflash.c
+¦   ¦       +-- chip_model.c
+¦   +-- i2cfw_0.1.bb
+
  */
 
 #include "i2cflash.h"

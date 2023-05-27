@@ -293,6 +293,23 @@ root@rockchip-rk3308:~# i2cset -y 3 0x4e 0x3 0x12
 root@rockchip-rk3308:~# i2cget -y 3 0x4e 0x3
 0x03
 
+To switch between TX and RX on HDMI matrix chip LT86204UX, please use the commands below.
+- TX3 select RX1 as input
+root@system-rk3588:~# i2cset -y 4 0x38 0xff 0xe0
+root@system-rk3588:~# i2cset -y 4 0x38 0xb3 0x11
+
+- TX3 select RX2 as input
+root@system-rk3588:~# i2cset -y 4 0x38 0xff 0xe0
+root@system-rk3588:~# i2cset -y 4 0x38 0xb3 0x12
+
+- TX0 select RX1 as input
+root@system-rk3588:~# i2cset -y 4 0x38 0xff 0xe0
+root@system-rk3588:~# i2cset -y 4 0x38 0xb0 0x11
+
+- TX0 select RX2 as input
+root@system-rk3588:~# i2cset -y 4 0x38 0xff 0xe0
+root@system-rk3588:~# i2cset -y 4 0x38 0xb0 0x12
+
 
 ----- SAR ADC -----
 root@rockchip-rk3308:/sys/devices/platform/ff1e0000.saradc/iio:device0# cat in_voltage0_raw
