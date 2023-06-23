@@ -2,7 +2,7 @@
  * (c) 2022 Yunjae Lim <launius@gmail.com>
  *
  * Hardware verification tools and commands
- * (DDR memory, eMMC disk I/O, I2C, SAR ADC)
+ * (DDR memory, eMMC disk I/O, I2C, HDMI Matrix Switch, SAR ADC)
  */
 
 ----- memtester -----
@@ -293,22 +293,21 @@ root@rockchip-rk3308:~# i2cset -y 3 0x4e 0x3 0x12
 root@rockchip-rk3308:~# i2cget -y 3 0x4e 0x3
 0x03
 
-To switch between TX and RX on HDMI matrix chip LT86204UX, please use the commands below.
-- TX3 select RX1 as input
-root@system-rk3588:~# i2cset -y 4 0x38 0xff 0xe0
-root@system-rk3588:~# i2cset -y 4 0x38 0xb3 0x11
+- Check chip ID
+root@system-rk3588:~# i2cset -y 4 0x38 0xff 0xe0	// switch to register bank 0xe0
+root@system-rk3588:~# i2cset -y 4 0x38 0xee 0x01	// enable I2C access
+root@system-rk3588:~# i2cset -y 4 0x38 0xff 0xe1
+root@system-rk3588:~# i2cget -y 4 0x38 0x00
+0x20
+root@system-rk3588:~# i2cget -y 4 0x38 0x01
+0x03
 
-- TX3 select RX2 as input
+- Switch between TX and RX on HDMI matrix chip LT86204UX
 root@system-rk3588:~# i2cset -y 4 0x38 0xff 0xe0
-root@system-rk3588:~# i2cset -y 4 0x38 0xb3 0x12
+root@system-rk3588:~# i2cset -y 4 0x38 0xb3 0x11	// TX3 select RX1 as input
 
-- TX0 select RX1 as input
 root@system-rk3588:~# i2cset -y 4 0x38 0xff 0xe0
-root@system-rk3588:~# i2cset -y 4 0x38 0xb0 0x11
-
-- TX0 select RX2 as input
-root@system-rk3588:~# i2cset -y 4 0x38 0xff 0xe0
-root@system-rk3588:~# i2cset -y 4 0x38 0xb0 0x12
+root@system-rk3588:~# i2cset -y 4 0x38 0xb0 0x12	// TX0 select RX2 as input
 
 
 ----- SAR ADC -----
