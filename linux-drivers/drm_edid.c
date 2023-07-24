@@ -33,6 +33,39 @@
  *
  * Debug the issue which is getting EDID fail from HDMI I2C bus.
  *
+commit 1ac08d301a077dad259cc5dadfe14995eaf75ce3 (HEAD -> develop-5.10)
+Author: Yunjae Lim <launius@gmail.com>
+Date:   Thu Jun 1 13:05:58 2023 +1000
+
+    dts: set bias pull-up and input Schmitt trigger for HDMI I2C bus
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3588-prod.dts b/arch/arm64/boot/dts/rockchip/rk3588-prod.dts
+index d689a82cd93e..6fd121cdfa0b 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3588-prod.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3588-prod.dts
+
+ &hdmi1 {
++       pinctrl-0 = <&hdmim1_tx1_cec &hdmim0_tx1_hpd &hdmim2_tx1_scl &hdmim2_tx1_sda &hdmi1_pwr>;
+        power-gpio = <&gpio4 RK_PA4 GPIO_ACTIVE_HIGH>;
+        status = "okay";
+ };
+
+ &pinctrl {
+ 
+        hdmi {
++               hdmim2_tx1_scl: hdmim2-tx1-scl {
++                       rockchip,pins = <1 RK_PA4 RK_PA5 &pcfg_pull_up_smt>;
++               };
++
++               hdmim2_tx1_sda: hdmim2-tx1-sda {
++                       rockchip,pins = <1 RK_PA3 RK_PA5 &pcfg_pull_up_smt>;
++               };
++
++               hdmi1_pwr: hdmi1-pwr {
++                       rockchip,pins = <4 RK_PA4 RK_FUNC_GPIO &pcfg_pull_up>;
+                };
+        };
+ 
 [    4.135095] dwhdmi-rockchip fdea0000.hdmi: dw_hdmi_i2c_read: reading... length 1, stat 80
 [    4.135660] dwhdmi-rockchip fdea0000.hdmi: dw_hdmi_i2c_read: read done! length -1, stat 30
 [    4.135689] dwhdmi-rockchip fdea0000.hdmi: dw_hdmi_i2c_read: reading... length 128, stat 80
@@ -40,7 +73,7 @@
 [    4.199104] dwhdmi-rockchip fdea0000.hdmi: dw_hdmi_i2c_read: reading... length 128, stat 80
 [    4.263114] dwhdmi-rockchip fdea0000.hdmi: dw_hdmi_i2c_read: read done! length -1, stat 30
 [    4.263137] drm_do_get_edid: got valid edid
-[    4.263153] rockchip-drm display-subsystem: [drm] connector_bad_edid: HDMI-A-2: EDID is invalid:
+[    4.263153] rockchip-drm display-subsystem: [drm] connector_bad_edid: HDMI-A-2: EDID is valid:
 [    4.263162]  [00] GOOD 00 ff ff ff ff ff ff 00 63 18 00 01 01 00 00 00
 [    4.263167]  [00] GOOD 08 1c 01 03 80 46 27 78 2a 5f b1 a2 57 4f a2 28
 [    4.263173]  [00] GOOD 0f 50 54 bf ef 80 71 4f 81 00 81 c0 81 80 95 00
