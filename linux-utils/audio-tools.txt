@@ -2,13 +2,28 @@
  * (c) 2023 Yunjae Lim <launius@gmail.com>
  *
  * Audio tools for DAC & ADC on Linux
+ *
  */
+
+------ List Soundcards and Audio devices -----
+root@dev-rk3588:~# aplay -l
+**** List of PLAYBACK Hardware Devices ****
+card 0: fe480000i2spcm1 [fe480000.i2s-pcm1681-hifi], device 0: fe480000.i2s-pcm1681-hifi pcm1681-hifi-0 [fe480000.i2s-pcm1681-hifi pcm1681-hifi-0]
+  Subdevices: 0/1
+  Subdevice #0: subdevice #0
+
+root@dev-rk3588:~# arecord -l
+**** List of CAPTURE Hardware Devices ****
+card 0: fe480000i2spcm1 [fe480000.i2s-pcm1681-hifi], device 1: fe480000.i2s-pcm1840-hifi pcm1840-hifi-1 [fe480000.i2s-pcm1840-hifi pcm1840-hifi-1]
+  Subdevices: 0/1
+  Subdevice #0: subdevice #0
+
 
 ------ Speaker Test -----
 # speaker-test -Dhw:0,0 -c 8 -F S32_LE -f 440 -t wav -l 1
 # speaker-test -D plughw:0,0 -c 8 -t wav -l 1
 
-root@rcv-rk3588:~# speaker-test -Dhw:0,0 -c 8 -t wav -l 1
+root@dev-rk3588:~# speaker-test -Dhw:0,0 -c 8 -t wav -l 1
 
 speaker-test 1.2.5.1
 
@@ -32,11 +47,12 @@ was set buffer_size = 32768
  5 - LFE
 Time per period = 10.756766
 
+
 ------ Audio Play -----
 # aplay -v -f S32_LE -r 48000 -c 2 -Dhw:0,0 /dev/zero
 # aplay -v -f S32_LE -r 48000 -c 2 -Dhw:0,0 /dev/urandom
 
-root@rcv-rk3588:~# aplay -v -D plughw:0,0 /usr/share/sounds/alsa/Front_Center.wav
+root@dev-rk3588:~# aplay -v -D plughw:0,0 /usr/share/sounds/alsa/Front_Center.wav
 Playing WAVE '/usr/share/sounds/alsa/Front_Center.wav' : Signed 16 bit Little Endian, Rate 48000 Hz, Mono
 Plug PCM: Route conversion PCM (sformat=S16_LE)
   Transformation table:
@@ -90,12 +106,13 @@ Its setup is:
   appl_ptr     : 0
   hw_ptr       : 0
 
+
 ------ Audio Record & Play, Loopback -----
 # arecord -r 48000 -f S32_LE -D plughw:0,1 -d 10 -c 4 /tmp/record.wav
 # aplay -v -D plughw:0,0 /tmp/record.wav
 # aplay -v -D hw:0,0 /tmp/record.wav
 
-root@rcv-rk3588:~# arecord -v -r 48000 -f S32_LE -D hw:0,1 -d 10 -c 4 /tmp/record.wav
+root@dev-rk3588:~# arecord -v -r 48000 -f S32_LE -D hw:0,1 -d 10 -c 4 /tmp/record.wav
 Recording WAVE '/tmp/record.wav' : Signed 32 bit Little Endian, Rate 48000 Hz, Channels 4
 Hardware PCM card 0 'fe480000.i2s-pcm1681-hifi' device 1 subdevice 0
 Its setup is:
@@ -123,7 +140,7 @@ Its setup is:
   appl_ptr     : 0
   hw_ptr       : 0
 
-root@rcv-rk3588:~# arecord -r 48000 -f S32_LE -D hw:0,1 -c 4 | aplay -v -D hw:0,0
+root@dev-rk3588:~# arecord -r 48000 -f S32_LE -D hw:0,1 -c 4 | aplay -v -D hw:0,0
 Recording WAVE 'stdin' : Signed 32 bit Little Endian, Rate 48000 Hz, Channels 4
 Playing WAVE 'stdin' : Signed 32 bit Little Endian, Rate 48000 Hz, Channels 4
 Hardware PCM card 0 'fe480000.i2s-pcm1681-hifi' device 0 subdevice 0
@@ -152,8 +169,9 @@ Its setup is:
   appl_ptr     : 0
   hw_ptr       : 0
 
+
 ------ Audio Mixer Contents & Controls -----
-root@rcv-rk3588:~# amixer -c 0 scontents
+root@dev-rk3588:~# amixer -c 0 scontents
 Simple mixer control 'I2STDM Digital Loopback Mode',0
   Capabilities: enum
   Items: 'Disabled' 'Mode1' 'Mode2' 'Mode2 Swap'
@@ -199,7 +217,7 @@ Simple mixer control 'U9 De-emphasis',0
   Playback channels: Mono
   Mono: Playback [off]
 
-root@rcv-rk3588:~# amixer -c 0 controls
+root@dev-rk3588:~# amixer -c 0 controls
 numid=1,iface=MIXER,name='I2STDM Digital Loopback Mode'
 numid=8,iface=MIXER,name='U8 Dynamic Range Enhancer Switch'
 numid=7,iface=MIXER,name='U8 Low Latency Filters Switch'
@@ -213,14 +231,70 @@ numid=6,iface=MIXER,name='U9 De-emphasis Switch'
 # amixer -c 0 sset 'U9 Channel 1/2',0 100% 100% on
 # amixer -D pulse sset Master 10%+
 # amixer set Master mute
-# alsamixer -c 0
+
+root@dev-rk3588:~# alsamixer -c 0
+lqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq AlsaMixer v1.2.5.1 qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqk
+x Card: fe480000.i2s-pcm1681-hifi                                                                                                                                               F1:  Help               x
+x Chip:                                                                                                                                                                         F2:  System information x
+x View: F3:[Playback] F4: Capture  F5: All                                                                                                                                      F6:  Select sound card  x
+x Item: I2STDM Digital Loopback Mode [Disabled]                                                                                                                                 Esc: Exit               x
+x                                                                                                                                                                                                       x
+x                                                                                                                                                                                                       x
+x                                                                                                                                                                                                       x
+x                                                                                                                                                                                                       x
+x                                                                                                                                                                                                       x
+x                                                                                                                                                                                                       x
+x                                                                                                                                                                                                       x
+x                                                                                                                                                                                                       x
+x                                                                                                                                                                                                       x
+x                                                                                                                                                                                                       x
+x                                                                                                                                                                                                       x
+x                                                                                     lqqk                    lqqk                    lqqk                    lqqk                                      x
+x                                                                                     x  x                    x  x                    x  x                    x  x                                      x
+x                                                                                     x  x                    x  x                    x  x                    x  x                                      x
+x                                                                                     x  x                    x  x                    x  x                    x  x                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x                                                                                     xaax                    xaax                    xaax                    xaax                                      x
+x           Disabled                  lqqk                    lqqk                    mqqj                    mqqj                    mqqj                    mqqj                    lqqk              x
+x                                     xOOx                    xOOx                                                                                                                    xMMx              x
+x                                     mqqj                    mqqj                                                                                                                    mqqj              x
+x                                                                                    89<>89                  91<>91                  91<>91                  89<>89                                     x
+x   <I2STDM Digital Loopback>U8 Dynamic Range Enhanc U8 Low Latency Filters      U9 Channel 1/2          U9 Channel 3/4          U9 Channel 5/6          U9 Channel 7/8          U9 De-emphasis      
+
 
 ------ Gain Control -----
 # echo 0 > /sys/devices/platform/ff560000.audio-codec/acodec-dev/dac_output
 # echo 15 > /sys/devices/platform/fead0000.i2c/i2c-5/5-0013/driver-name/gain_ch1
 
+
 ------ JACK Audio Connection Kit -----
-root@rcv-rk3588:~# jackd -dalsa -C hw:0,1 -P hw:0,0 -r 48000
+root@dev-rk3588:~# jackd -dalsa -C hw:0,1 -P hw:0,0 -r 48000
 jackdmp 1.9.19
 Copyright 2001-2005 Paul Davis and others.
 Copyright 2004-2016 Grame.
@@ -240,7 +314,7 @@ ALSA: use 2 periods for playback
 # jackd -dalsa -C hw:0,1 -P hw:0,0 -r 48000 -p128 &
 # jackd --port-max 100 -P 51 -d alsa -C hw:0,1 -P hw:0,0 -r 48000 -p 112
 
-root@rcv-rk3588:~# jack_lsp -c
+root@dev-rk3588:~# jack_lsp -c
 system:capture_1
 system:capture_2
 system:capture_3
@@ -258,6 +332,7 @@ system:playback_8
 # jack_connect system:capture_2 system:playback_2
 # jack_connect system:capture_1 system:playback_3
 # jack_connect system:capture_2 system:playback_4
+
 
 ------ PulseAudio -----
 # pulseaudio --start
