@@ -81,7 +81,47 @@ index 5f291045e8fd..f9b476a55d57 100644
 +#define RK_FUNC_5      5
  
  #endif
- 
+ *
+ *
+// 1. PLUGGED SONY Screen on HDMI OUT
+[2]TX3 HPD HIGH		//1-1. HPD on TX3
+[2]Tx3 edid content is:
+   00 ff ff ff ff ff ff 00 4d d9 03 94 01 01 01 01
+   01 19 01 03 80 a6 5d 78 0a 0d c9 a0 57 47 98 27
+   12 48 4c 21 08 00 81 80 a9 c0 71 4f b3 00 01 01
+   01 01 01 01 01 01 02 3a 80 18 71 38 2d 40 58 2c
+   45 00 7c a6 63 00 00 1e 01 1d 00 72 51 d0 1e 20
+   6e 28 55 00 7c a6 63 00 00 1e 00 00 00 fc 00 53
+   4f 4e 59 20 54 56 20 20 2a 30 32 0a 00 00 00 fd
+   00 30 3e 0e 46 1e 00 0a 20 20 20 20 20 20 01 3b	//2. RECEIVED SONY EDID
+   02 03 54 f0 57 5d 5e 5f 62 1f 10 14 05 13 04 20
+   22 3c 3e 12 16 03 07 11 15 02 06 01 29 0d 7f 07
+   15 07 50 3d 07 bc 83 0f 00 00 78 03 0c 00 10 00
+   b8 3c 2f d0 8a 01 02 03 04 01 40 07 f0 60 70 b0
+   c0 d0 b6 e2 00 f9 e3 05 ff 01 e5 0e 60 61 65 66
+   e3 06 0d 01 01 1d 80 18 71 1c 16 20 58 2c 25 00
+   7c a6 63 00 00 9e 00 00 00 00 00 00 00 00 00 00
+   00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 14
+[2]TX3 max resolution is 4K
+[2]Rx0 edid set
+[2]Rx1 edid set
+[2]Rx2 edid set		//3. SET SONY EDID
+[2]Rx3 edid set
+[2]Rx3 hpd=0
+[2]Rx-pll3 power option is 0
+[2]Rx2 hpd=0
+[2]Rx-pll2 power option is 0
+[2]Rx0 hpd=0
+[2]Rx-pll0 power option is 0
+[2]Rx1 hpd=0
+[2]Rx-pll1 power option is 0
+[2]Txpll3 power option is 1
+[2]Rx3 into power down state
+[2]Rx2 into power down state
+[2]Rx0 into power down state
+[2]Rx2 hpd=1		//4. HPD on RX2
+ *
+ *
 [    4.135095] dwhdmi-rockchip fdea0000.hdmi: dw_hdmi_i2c_read: reading... length 1, stat 80
 [    4.135660] dwhdmi-rockchip fdea0000.hdmi: dw_hdmi_i2c_read: read done! length -1, stat 30
 [    4.135689] dwhdmi-rockchip fdea0000.hdmi: dw_hdmi_i2c_read: reading... length 128, stat 80
@@ -90,14 +130,14 @@ index 5f291045e8fd..f9b476a55d57 100644
 [    4.263114] dwhdmi-rockchip fdea0000.hdmi: dw_hdmi_i2c_read: read done! length -1, stat 30
 [    4.263137] drm_do_get_edid: got valid edid
 [    4.263153] rockchip-drm display-subsystem: [drm] connector_bad_edid: HDMI-A-2: EDID is valid:
-[    4.263162]  [00] GOOD 00 ff ff ff ff ff ff 00 63 18 00 01 01 00 00 00
-[    4.263167]  [00] GOOD 08 1c 01 03 80 46 27 78 2a 5f b1 a2 57 4f a2 28
-[    4.263173]  [00] GOOD 0f 50 54 bf ef 80 71 4f 81 00 81 c0 81 80 95 00
-[    4.263178]  [00] GOOD a9 c0 b3 00 01 01 02 3a 80 18 71 38 2d 40 58 2c
-[    4.263183]  [00] GOOD 45 00 50 1d 74 00 00 1e 01 1d 00 72 51 d0 1e 20
-[    4.263188]  [00] GOOD 6e 28 55 00 c4 8e 21 00 00 1e 00 00 00 fd 00 18
-[    4.263193]  [00] GOOD 4b 1e 87 17 01 00 0a 20 20 20 20 20 00 00 00 fc
-[    4.263199]  [00] GOOD 00 32 43 48 31 30 38 30 20 20 20 0a 20 20 01 88
+[    4.263162]  [00] GOOD 00 ff ff ff ff ff ff 00 4d d9 03 94 01 01 01 01
+[    4.263167]  [00] GOOD 01 19 01 03 80 a6 5d 78 0a 0d c9 a0 57 47 98 27
+[    4.263173]  [00] GOOD 12 48 4c 21 08 00 81 80 a9 c0 71 4f b3 00 01 01
+[    4.263178]  [00] GOOD 01 01 01 01 01 01 02 3a 80 18 71 38 2d 40 58 2c
+[    4.263183]  [00] GOOD 45 00 7c a6 63 00 00 1e 01 1d 00 72 51 d0 1e 20
+[    4.263188]  [00] GOOD 6e 28 55 00 7c a6 63 00 00 1e 00 00 00 fc 00 53
+[    4.263193]  [00] GOOD 4f 4e 59 20 54 56 20 20 2a 30 32 0a 00 00 00 fd
+[    4.263199]  [00] GOOD 00 30 3e 0e 46 1e 00 0a 20 20 20 20 20 20 01 3b	//1-5. RK RECEIVED SONY EDID
  *
  */
 
