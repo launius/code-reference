@@ -54,17 +54,33 @@ index d689a82cd93e..6fd121cdfa0b 100644
  
         hdmi {
 +               hdmim2_tx1_scl: hdmim2-tx1-scl {
-+                       rockchip,pins = <1 RK_PA4 RK_PA5 &pcfg_pull_up_smt>;
++                       rockchip,pins = <1 RK_PA4 RK_FUNC_5 &pcfg_pull_up_smt>;
 +               };
 +
 +               hdmim2_tx1_sda: hdmim2-tx1-sda {
-+                       rockchip,pins = <1 RK_PA3 RK_PA5 &pcfg_pull_up_smt>;
++                       rockchip,pins = <1 RK_PA3 RK_FUNC_5 &pcfg_pull_up_smt>;
 +               };
 +
 +               hdmi1_pwr: hdmi1-pwr {
 +                       rockchip,pins = <4 RK_PA4 RK_FUNC_GPIO &pcfg_pull_up>;
                 };
         };
+
+diff --git a/include/dt-bindings/pinctrl/rockchip.h b/include/dt-bindings/pinctrl/rockchip.h
+index 5f291045e8fd..f9b476a55d57 100644
+--- a/include/dt-bindings/pinctrl/rockchip.h
++++ b/include/dt-bindings/pinctrl/rockchip.h
+@@ -43,5 +43,10 @@
+ #define RK_PD7         31
+ 
+ #define RK_FUNC_GPIO   0
++#define RK_FUNC_1      1
++#define RK_FUNC_2      2
++#define RK_FUNC_3      3
++#define RK_FUNC_4      4
++#define RK_FUNC_5      5
+ 
+ #endif
  
 [    4.135095] dwhdmi-rockchip fdea0000.hdmi: dw_hdmi_i2c_read: reading... length 1, stat 80
 [    4.135660] dwhdmi-rockchip fdea0000.hdmi: dw_hdmi_i2c_read: read done! length -1, stat 30
