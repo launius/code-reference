@@ -2,7 +2,7 @@
  * (c) 2022 Yunjae Lim <launius@gmail.com>
  *
  * Hardware verification tools and commands
- * (DDR memory, eMMC disk I/O, I2C, HDMI Matrix Switch, SAR ADC)
+ * (DDR memory, eMMC disk I/O, I2C, HDMI Matrix Switch, SAR ADC, RTC, GPIO, USB)
  */
 
 ----- memtester -----
@@ -123,28 +123,29 @@ block size : single random read / dual random read
   67108864 :  313.3 ns          /   379.9 ns
 
 
------ eMMC performance -----
-root@rockchip-rk3308:~# cat /sys/kernel/debug/mmc0/ios
-clock:          150000000 Hz
-actual clock:   147456000 Hz
-vdd:            21 (3.3 ~ 3.4 V)
+----- eMMC disk I/O performance -----
+root@system:/# cat /sys/kernel/debug/mmc0/ios
+clock:          200000000 Hz
+actual clock:   100000000 Hz
+vdd:            18 (3.0 ~ 3.1 V)
 bus mode:       2 (push-pull)
 chip select:    0 (don't care)
 power mode:     2 (on)
 bus width:      3 (8 bits)
-timing spec:    9 (mmc HS200)
+timing spec:    10 (mmc HS400 enhanced strobe)
 signal voltage: 1 (1.80 V)
 driver type:    0 (driver type B)
 
-root@rockchip-rk3308:/# dd if=/dev/urandom of=/test bs=1M count=40
-40+0 records in
-40+0 records out
-41943040 bytes (40.0MB) copied, 2.621640 seconds, 15.3MB/s
+root@system:/# dd if=/dev/urandom of=/test bs=1M count=200 oflag=direct
+200+0 records in
+200+0 records out
+209715200 bytes (210 MB, 200 MiB) copied, 1.89244 s, 111 MB/s
 
-root@rockchip-rk3308:/# dd if=/test of=/dev/null bs=1M count=40
-40+0 records in
-40+0 records out
-41943040 bytes (40.0MB) copied, 0.082696 seconds, 483.7MB/s
+root@system:/# echo 3 > /proc/sys/vm/drop_caches
+root@system:/# dd if=/test of=/dev/null bs=1M count=200 oflag=dsync
+200+0 records in
+200+0 records out
+209715200 bytes (210 MB, 200 MiB) copied, 0.659761 s, 318 MB/s
 
 
 ----- bonnie++ disk I/O -----
@@ -354,3 +355,108 @@ root@rockchip-rk3308:/sys/devices/platform/ff1e0000.saradc/iio:device0# cat /sys
 [  768.636311] rockchip_saradc_read_raw: IIO_CHAN_INFO_RAW 164
 [  768.636327] rockchip_saradc_read_raw: IIO_CHAN_INFO_SCALE 1800 10
 [  768.636338] iio_hwmon_read_val: type 0, result 288
+
+
+----- Real-Time Clock / RTC -----
+
+- Set system time from hardware clock
+root@system:~# date
+Mon Dec  4 03:31:50 UTC 2023
+root@system:~# hwclock -r
+2023-12-04 03:30:50.366941+00:00
+root@system:~# hwclock -s
+root@system:~# date
+Mon Dec  4 03:31:01 UTC 2023
+
+- Set hardware clock from system time
+root@system:~# hwclock -w
+
+- Set system time
+root@system:~# date -s "2023-12-4 14:34:00"
+Mon Dec  4 14:34:00 UTC 2023
+
+
+----- Reset chips by GPIO pin -----
+root@system:~# cat /sys/kernel/debug/gpio
+gpiochip0: GPIOs 0-31, parent: platform/fd8a0000.gpio, gpio0:
+ gpio-23  (                    |vcc-3v3-sd-s0-regula) out lo
+
+gpiochip1: GPIOs 32-63, parent: platform/fec20000.gpio, gpio1:
+ gpio-36  (                    |sync                ) in  lo
+ gpio-41  (                    |reset               ) out lo
+...
+
+root@system:~# cat /sys/kernel/debug/pinctrl/pinctrl-rockchip-pinctrl/pinconf-pins
+Pin config settings per pin
+Format: pin (name): configs
+pin 0 (gpio0-0): input bias pull down (1 ohms), output drive strength (4 mA), input schmitt enabled, pin output (0 level)
+pin 1 (gpio0-1): input bias disabled, output drive strength (4 mA), input schmitt enabled
+pin 2 (gpio0-2): input bias disabled, output drive strength (4 mA), input schmitt enabled
+...
+pin 38 (gpio1-6): input bias disabled, output drive strength (8 mA), input schmitt enabled
+pin 39 (gpio1-7): input bias pull up (1 ohms), output drive strength (8 mA), input schmitt enabled, pin output (1 level)
+pin 40 (gpio1-8): input bias pull up (1 ohms), output drive strength (8 mA), input schmitt enabled, pin output (0 level)
+
+root@system:~# echo 39 > /sys/class/gpio/export
+root@system:~# echo out > /sys/class/gpio/gpio39/direction
+root@system:~# echo 1 > /sys/class/gpio/gpio39/value
+root@system:~# echo 0 > /sys/class/gpio/gpio39/value
+
+root@system:~# ls -l /sys/class/gpio/
+total 0
+--w------- 1 root root 4096 Dec  6 05:23 export
+lrwxrwxrwx 1 root root    0 Dec  6 05:27 gpio150 -> ../../devices/platform/fec50000.gpio/gpiochip4/gpio/gpio150
+lrwxrwxrwx 1 root root    0 Dec  6 05:27 gpio39 -> ../../devices/platform/fec20000.gpio/gpiochip1/gpio/gpio39
+lrwxrwxrwx 1 root root    0 Dec  6 05:27 gpio77 -> ../../devices/platform/fec30000.gpio/gpiochip2/gpio/gpio77
+lrwxrwxrwx 1 root root    0 Dec  6 05:27 gpiochip0 -> ../../devices/platform/fd8a0000.gpio/gpio/gpiochip0
+lrwxrwxrwx 1 root root    0 Dec  6 05:27 gpiochip128 -> ../../devices/platform/fec50000.gpio/gpio/gpiochip128
+lrwxrwxrwx 1 root root    0 Dec  6 05:27 gpiochip32 -> ../../devices/platform/fec20000.gpio/gpio/gpiochip32
+lrwxrwxrwx 1 root root    0 Dec  6 05:27 gpiochip436 -> ../../devices/platform/feac0000.i2c/i2c-4/4-0013/gpio/gpiochip436
+lrwxrwxrwx 1 root root    0 Dec  6 05:27 gpiochip485 -> ../../devices/platform/feab0000.i2c/i2c-3/3-0012/gpio/gpiochip485
+lrwxrwxrwx 1 root root    0 Dec  6 05:27 gpiochip509 -> ../../devices/platform/feb20000.spi/spi_master/spi2/spi2.0/rk806-pinctrl.0.auto/gpio/gpiochip509
+lrwxrwxrwx 1 root root    0 Dec  6 05:27 gpiochip64 -> ../../devices/platform/fec30000.gpio/gpio/gpiochip64
+lrwxrwxrwx 1 root root    0 Dec  6 05:27 gpiochip96 -> ../../devices/platform/fec40000.gpio/gpio/gpiochip96
+--w------- 1 root root 4096 Dec  6 05:27 unexport
+
+
+----- USB port and device speed -----
+root@system:~# lsusb -tvv
+/:  Bus 10.Port 1: Dev 1, Class=root_hub, Driver=xhci_hcd/2p, 5000M
+    ID 1d6b:0003 Linux Foundation 3.0 root hub
+    /sys/bus/usb/devices/usb10  /dev/bus/usb/010/001
+/:  Bus 09.Port 1: Dev 1, Class=root_hub, Driver=xhci_hcd/2p, 5000M
+    ID 1d6b:0003 Linux Foundation 3.0 root hub
+    /sys/bus/usb/devices/usb9  /dev/bus/usb/009/001
+    |__ Port 2: Dev 2, If 0, Class=Mass Storage, Driver=uas, 5000M
+        ID 04e8:4001 Samsung Electronics Co., Ltd
+        /sys/bus/usb/devices/9-2  /dev/bus/usb/009/002
+/:  Bus 08.Port 1: Dev 1, Class=root_hub, Driver=xhci_hcd/2p, 480M
+    ID 1d6b:0002 Linux Foundation 2.0 root hub
+    /sys/bus/usb/devices/usb8  /dev/bus/usb/008/001
+    |__ Port 1: Dev 3, If 0, Class=Mass Storage, Driver=usb-storage, 480M
+        ID 058f:6387 Alcor Micro Corp. Flash Drive
+        /sys/bus/usb/devices/8-1  /dev/bus/usb/008/003
+/:  Bus 07.Port 1: Dev 1, Class=root_hub, Driver=xhci_hcd/2p, 480M
+    ID 1d6b:0002 Linux Foundation 2.0 root hub
+    /sys/bus/usb/devices/usb7  /dev/bus/usb/007/001
+/:  Bus 06.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
+    ID 1d6b:0003 Linux Foundation 3.0 root hub
+    /sys/bus/usb/devices/usb6  /dev/bus/usb/006/001
+/:  Bus 05.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
+    ID 1d6b:0002 Linux Foundation 2.0 root hub
+    /sys/bus/usb/devices/usb5  /dev/bus/usb/005/001
+/:  Bus 04.Port 1: Dev 1, Class=root_hub, Driver=ohci-platform/1p, 12M
+    ID 1d6b:0001 Linux Foundation 1.1 root hub
+    /sys/bus/usb/devices/usb4  /dev/bus/usb/004/001
+/:  Bus 03.Port 1: Dev 1, Class=root_hub, Driver=ohci-platform/1p, 12M
+    ID 1d6b:0001 Linux Foundation 1.1 root hub
+    /sys/bus/usb/devices/usb3  /dev/bus/usb/003/001
+/:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=ehci-platform/1p, 480M
+    ID 1d6b:0002 Linux Foundation 2.0 root hub
+    /sys/bus/usb/devices/usb2  /dev/bus/usb/002/001
+/:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=ehci-platform/1p, 480M
+    ID 1d6b:0002 Linux Foundation 2.0 root hub
+    /sys/bus/usb/devices/usb1  /dev/bus/usb/001/001
+
+root@system:~# cat /sys/bus/usb/devices/usb9/speed
+5000
