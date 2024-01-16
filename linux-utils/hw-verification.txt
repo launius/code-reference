@@ -2,7 +2,7 @@
  * (c) 2022 Yunjae Lim <launius@gmail.com>
  *
  * Hardware verification tools and commands
- * (DDR memory, eMMC disk I/O, I2C, HDMI Matrix Switch, SAR ADC, RTC, GPIO, USB)
+ * (DDR memory, eMMC disk I/O, I2C, HDMI Matrix Switch, SAR ADC, RTC, GPIO, USB, PWM)
  */
 
 ----- memtester -----
@@ -460,3 +460,44 @@ root@system:~# lsusb -tvv
 
 root@system:~# cat /sys/bus/usb/devices/usb9/speed
 5000
+
+
+----- PWM fan control -----
+
+- DTS node configuration
+fan: pwm-fan {
+	compatible = "pwm-fan";
+	#cooling-cells = <2>;
+	pwms = <&pwm15 0 50000 0>;
+};
+
+&pwm15 {
+	pinctrl-0 = <&pwm15m2_pins>;
+	status = "okay";
+};
+
+- Set fan speed
+root@system:~# cd /sys/class/pwm/
+root@system:/sys/class/pwm# ls -l
+total 0
+lrwxrwxrwx 1 root root 0 Jan 16 05:00 pwmchip0 -> ../../devices/platform/febd0030.pwm/pwm/pwmchip0
+lrwxrwxrwx 1 root root 0 Jan 16 05:00 pwmchip1 -> ../../devices/platform/febf0030.pwm/pwm/pwmchip1
+root@system:/sys/class/pwm# echo 0 > pwmchip1/export
+root@system:/sys/class/pwm# cd pwmchip1/pwm0/
+root@system:/sys/class/pwm/pwmchip1/pwm0# ls -l
+total 0
+-r--r--r-- 1 root root 4096 Jan 16 05:01 capture
+-rw-r--r-- 1 root root 4096 Jan 16 05:01 duty_cycle
+-rw-r--r-- 1 root root 4096 Jan 16 05:01 enable
+-r--r--r-- 1 root root 4096 Jan 16 05:01 output_type
+-rw-r--r-- 1 root root 4096 Jan 16 05:01 period
+-rw-r--r-- 1 root root 4096 Jan 16 05:01 polarity
+drwxr-xr-x 2 root root    0 Jan 16 05:01 power
+-rw-r--r-- 1 root root 4096 Jan 16 05:01 uevent
+root@system:/sys/class/pwm/pwmchip1/pwm0# echo 10000 > period
+root@system:/sys/class/pwm/pwmchip1/pwm0# echo 5000 > duty_cycle
+root@system:/sys/class/pwm/pwmchip1/pwm0# cat polarity
+inversed
+root@system:/sys/class/pwm/pwmchip1/pwm0# echo 1 > enable
+root@system:/sys/class/pwm/pwmchip1/pwm0# echo 9000 > duty_cycle
+root@system:/sys/class/pwm/pwmchip1/pwm0# echo 1000 > duty_cycle
