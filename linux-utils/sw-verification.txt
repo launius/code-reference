@@ -1,0 +1,149 @@
+/*
+ * (c) 2024 Yunjae Lim <launius@gmail.com>
+ *
+ * Software verification tools and commands
+ * (Memory leaks)
+ */
+
+----- proc memory info -----
+root@system:~# watch 'grep -e VmSize -e VmRSS /proc/789/status'
+Every 2.0s: grep -e VmSize -e VmRSS /proc/789/status                                linuxsystem: Wed Jul 24 02:49:07 2024
+
+VmSize:  1976260 kB
+VmRSS:    801848 kB
+
+root@system:~# cat /proc/meminfo
+MemTotal:        7853640 kB
+MemFree:         5718976 kB
+MemAvailable:    6125492 kB
+Buffers:            4108 kB
+Cached:          1413752 kB
+SwapCached:            0 kB
+Active:           102124 kB
+Inactive:         487392 kB
+Active(anon):       1260 kB
+Inactive(anon):   174440 kB
+Active(file):     100864 kB
+Inactive(file):   312952 kB
+Unevictable:     1001020 kB
+Mlocked:           42480 kB
+SwapTotal:             0 kB
+SwapFree:              0 kB
+Dirty:                 0 kB
+Writeback:             0 kB
+AnonPages:        164540 kB
+Mapped:           742472 kB
+Shmem:           1004044 kB
+KReclaimable:      73360 kB
+Slab:             139264 kB
+SReclaimable:      73360 kB
+SUnreclaim:        65904 kB
+KernelStack:        6160 kB
+PageTables:         5208 kB
+NFS_Unstable:          0 kB
+...
+
+
+----- kmemleak tool -----
+- kernel configs in "Kernel hacking"
+CONFIG_HAVE_DEBUG_KMEMLEAK=y
+CONFIG_DEBUG_KMEMLEAK=y
+CONFIG_DEBUG_KMEMLEAK_TEST=m
+
+root@system:~# mount -t debugfs nodev /sys/kernel/debug/
+root@system:~# cat /sys/kernel/debug/kmemleak
+unreferenced object 0xffffff813ea0c400 (size 128):
+  comm "video-engine", pid 983, jiffies 4294883956 (age 13315.360s)
+  hex dump (first 32 bytes):
+    01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+    80 c9 a0 3e 81 ff ff ff 00 fc fe 0d 81 ff ff ff  ...>............
+  backtrace:
+    [<000000008f664944>] slab_post_alloc_hook+0xd0/0x1cc
+    [<00000000d2bb253f>] kmem_cache_alloc_trace+0x11c/0x1e0
+    [<00000000897a026e>] drm_vma_node_allow+0x3c/0xe4
+    [<000000007ff8c33d>] drm_gem_handle_create_tail+0xc4/0x168
+    [<00000000a6a558a0>] drm_gem_handle_create+0x48/0x5c
+    [<00000000ff785dd3>] rockchip_gem_create_with_handle+0x54/0x90
+    [<00000000c82250fb>] rockchip_gem_dumb_create+0x54/0x68
+    [<000000000e3cc1ff>] drm_mode_create_dumb+0xa0/0xb4
+    [<0000000096fe2428>] drm_mode_create_dumb_ioctl+0x1c/0x28
+    [<00000000785b196f>] drm_ioctl_kernel+0xb0/0x104
+    [<00000000f17dc8dd>] drm_ioctl+0x2fc/0x348
+    [<000000003b3b82f3>] vfs_ioctl+0x34/0x54
+    [<000000004bc98c44>] __arm64_sys_ioctl+0x6c/0xa8
+    [<00000000d653fe6c>] el0_svc_common.constprop.0+0x13c/0x1ec
+    [<000000001d2718db>] do_el0_svc+0x90/0x9c
+    [<00000000dfc98284>] el0_svc+0x20/0x30
+unreferenced object 0xffffff813ea0c980 (size 128):
+  comm "video-engine", pid 983, jiffies 4294883956 (age 13315.364s)
+  hex dump (first 32 bytes):
+    00 c4 a0 3e 81 ff ff ff 00 00 00 00 00 00 00 00  ...>............
+    00 00 00 00 00 00 00 00 00 c8 34 07 81 ff ff ff  ..........4.....
+  backtrace:
+    [<000000008f664944>] slab_post_alloc_hook+0xd0/0x1cc
+    [<00000000d2bb253f>] kmem_cache_alloc_trace+0x11c/0x1e0
+    [<00000000897a026e>] drm_vma_node_allow+0x3c/0xe4
+    [<000000007ff8c33d>] drm_gem_handle_create_tail+0xc4/0x168
+    [<0000000009af092d>] drm_gem_prime_fd_to_handle+0x11c/0x174
+    [<00000000d3cc623c>] drm_prime_fd_to_handle_ioctl+0x34/0x48
+    [<00000000785b196f>] drm_ioctl_kernel+0xb0/0x104
+    [<00000000f17dc8dd>] drm_ioctl+0x2fc/0x348
+    [<000000003b3b82f3>] vfs_ioctl+0x34/0x54
+    [<000000004bc98c44>] __arm64_sys_ioctl+0x6c/0xa8
+    [<00000000d653fe6c>] el0_svc_common.constprop.0+0x13c/0x1ec
+    [<000000001d2718db>] do_el0_svc+0x90/0x9c
+    [<00000000dfc98284>] el0_svc+0x20/0x30
+    [<000000005522d0f1>] el0_sync_handler+0xbc/0x158
+    [<0000000014d9768d>] el0_sync+0x1a0/0x1c0
+
+root@system:~# echo clear > /sys/kernel/debug/kmemleak
+root@system:~# echo scan > /sys/kernel/debug/kmemleak
+
+
+----- top -----
+root@system:~# top
+top - 05:21:47 up 1 day,  5:25,  2 users,  load average: 4.43, 3.85, 3.59
+Tasks: 283 total,   2 running, 281 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  5.3 us,  7.5 sy,  0.0 ni, 87.1 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+MiB Mem :   7669.6 total,   5585.1 free,    628.1 used,   1456.3 buff/cache
+MiB Swap:      0.0 total,      0.0 free,      0.0 used.   5982.1 avail Mem
+
+  PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+  789 user    20   0 1976260 803756 713780 S  50.8  10.2 750:04.11 test_app1
+  562 user    20   0  137900  66400  46804 S   5.0   0.8  85:06.33 test_app2
+ 1133 user    20   0  118404  47020  46556 S   1.3   0.6  22:02.41 program
+...
+
+
+----- slabtop -----
+root@system:~# slabtop
+ Active / Total Objects (% used)    : 544497 / 546096 (99.7%)
+ Active / Total Slabs (% used)      : 17303 / 17303 (100.0%)
+ Active / Total Caches (% used)     : 79 / 126 (62.7%)
+ Active / Total Size (% used)       : 123030.62K / 123875.87K (99.3%)
+ Minimum / Average / Maximum Object : 0.02K / 0.23K / 8.00K
+
+  OBJS ACTIVE  USE OBJ SIZE  SLABS OBJ/SLAB CACHE SIZE NAME
+263392 263392 100%    0.12K   8231       32     32924K buffer_head
+ 51328  50901  99%    0.12K   1604       32      6416K kmalloc-128
+ 45664  45664 100%    0.12K   1427       32      5708K kernfs_node_cache
+ 38073  38073 100%    0.21K   1029       37      8232K dentry
+...
+
+
+----- vmstat -----
+root@system:~# vmstat 300 -t
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu----- -----timestamp-----
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st                 GMT
+ 1  0      0 6183332   3528 1253956    0    0    20     1 3205 4394  6  7 87  0  0 2024-07-26 07:24:06
+ 1  0      0 6180480   3528 1253960    0    0     0     2 22893 31071  6  7 88  0  0 2024-07-26 07:29:06
+ 0  0      0 6179960   3528 1253972    0    0     0     2 23189 30908  5  7 88  0  0 2024-07-26 07:34:06
+ 5  0      0 6180132   3528 1254296    0    0     0     2 22435 30489  6  7 88  0  0 2024-07-26 07:39:06
+ 2  0      0 6178992   3528 1254604    0    0     0     2 23287 31002  6  7 88  0  0 2024-07-26 07:44:06
+...
+
+
+----- valgrind -----
+root@system:~# valgrind --tool=massif prog
+root@system:~# ms_print massif.out.12345
+root@system:~# valgrind --leak-check=yes --log-file="log.txt" prog
