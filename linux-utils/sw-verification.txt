@@ -2,7 +2,7 @@
  * (c) 2024 Yunjae Lim <launius@gmail.com>
  *
  * Software verification tools and commands
- * (Memory leaks)
+ * (Memory leaks, USB HID)
  */
 
 ----- proc memory info -----
@@ -147,3 +147,61 @@ procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
 root@system:~# valgrind --tool=massif prog
 root@system:~# ms_print massif.out.12345
 root@system:~# valgrind --leak-check=yes --log-file="log.txt" prog
+
+
+----- USB hidapi library & hidapitester -----
+# Simple command-line program to exercise HIDAPI
+
+# 1. Prerequisite
+user@user-MINIPC-PN50-E1:~/tools/hidapitester$ sudo apt install libudev1 libudev-dev pkg-config
+
+# 2. Compiling
+user@user-MINIPC-PN50-E1:~/tools$ git clone https://github.com/todbot/hidapitester
+user@user-MINIPC-PN50-E1:~/tools$ git clone https://github.com/libusb/hidapi
+user@user-MINIPC-PN50-E1:~/tools/hidapitester$ make
+
+# 3. Listing devices
+user@user-MINIPC-PN50-E1:~/tools/hidapitester$ ./hidapitester --list-detail
+19F7/004A:  -
+  vendorId:      0x19F7
+  productId:     0x004A
+  usagePage:     0xFF00
+  usage:         0x0001
+  serial_number: 0E8A4616
+  interface:     3
+  path: /dev/hidraw9
+
+# 4. Setting udev permissions
+user@user-MINIPC-PN50-E1:~/tools/hidapitester$ udevadm info -a -n /dev/hidraw9
+
+  looking at device '/devices/pci0000:00/0000:00:01.2/0000:01:00.0/usb1/1-1/1-1:1.3/0003:19F7:004A.018E/hidraw/hidraw9':
+    KERNEL=="hidraw9"
+    SUBSYSTEM=="hidraw"
+    DRIVER==""
+    ATTR{power/async}=="disabled"
+    ATTR{power/control}=="auto"
+    ATTR{power/runtime_active_kids}=="0"
+    ATTR{power/runtime_active_time}=="0"
+    ATTR{power/runtime_enabled}=="disabled"
+    ATTR{power/runtime_status}=="unsupported"
+    ATTR{power/runtime_suspended_time}=="0"
+    ATTR{power/runtime_usage}=="0"
+
+user@user-MINIPC-PN50-E1:~/tools/hidapitester$ cat /etc/udev/rules.d/99-hidraw-permission.rules
+KERNEL=="hidraw9", SUBSYSTEM=="hidraw", MODE="0666", OWNER="user", GROUP="user"
+user@user-MINIPC-PN50-E1:~/tools$ sudo udevadm control --reload
+user@user-MINIPC-PN50-E1:~/tools$ sudo udevadm trigger
+user@user-MINIPC-PN50-E1:~/tools$ ll /dev/hidraw9
+crw-rw-rw- 1 user user 241, 9 Jul 10 15:20 /dev/hidraw9
+
+# 5. Opening devices, Reading and Writing reports
+# (e.g. report id = 2, set LED color command = 'C', color = 2)
+user@user-MINIPC-PN50-E1:~/tools/hidapitester$ ./hidapitester --vidpid 19F7:004A --open --length 64 --send-output 2,67,2 --timeout 500 --read-input --close
+Opening device, vid/pid: 0x19F7/0x004A
+Writing output report of 64-bytes...wrote 64 bytes:
+ 02 43 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+ 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+Reading up to 64-byte input report, 500 msec timeout...read 10 bytes:
+ 01 43 41 0A 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+ 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+Closing device
