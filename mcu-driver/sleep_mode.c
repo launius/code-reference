@@ -7,7 +7,7 @@
  * Any interrupt or wakeup event from EXTI lines can wake up the
  * system from the deep-sleep mode including the 16 external lines.
  *
- * EXTI sources selection register 1 (SYSCFG_EXTISS1)
+ * 1. EXTI sources selection register 1 (SYSCFG_EXTISS1)
 
 	15          12   11           8   7            4   3            0
 	-------------------------------------------------------------------
@@ -24,11 +24,29 @@
 							X101: PF5 pin
 							X110: Reserved
 							X111: Reserved
+ *
+ * 2. Interrupt vector table
+
+	Interrupt number    Vector number    Peripheral interrupt description
+	---------------------------------------------------------------------
+	IRQ 5               21               EXTI line0-1 interrupts
+	IRQ 6               22               EXTI line2-3 interrupts
+	IRQ 7               23               EXTI line4-15 interrupts
+ *
+ * 3. EXTI source
  
+	EXTI Line    Source
+	Number
+	----------------------------------
+	5            PA5 / PB5 / PC5 / PF5
+ *
  * Reference: https://www.gigadevice.com.cn/Public/Uploads/uploadfile/files/20240407/GD32F3x0_User_Manual_Rev2.9.pdf
  */
 
 #include "gd32f3x0.h"	// including gd32f3x0_syscfg.h and gd32f3x0_exti.h
+
+#define EXTI_IRQ_PREPRIORITY									6U
+#define EXTI_IRQ_SUBPRIORITY									1U
 
 struct sleep_mode_config
 {
@@ -59,12 +77,16 @@ void sleep_mode_enable(void)
 {
     exti_interrupt_flag_clear(smc.linex);
 
-    digital_io_deinit();
+	/// do something before entering deep-sleep mode.
+	// e.g. disable peripherals, save state, etc.
+	// digital_io_deinit();
 
     /* Enter to sleep mode */
     __disable_irq();
     pmu_to_deepsleepmode(PMU_LDO_LOWPOWER, WFI_CMD);
     __enable_irq();
 
-    digital_io_init();
+	// do something after waking up from deep-sleep mode
+	// e.g. re-initialize peripherals, restore state, etc.
+	// digital_io_init();
 }
